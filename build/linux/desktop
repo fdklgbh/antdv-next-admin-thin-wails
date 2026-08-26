@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=My Product
+Comment=A antdv-next-admin-thin-wails application
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/antdv-next-admin-thin-wails.exe %u
+Terminal=false
+Type=Application
+Icon=antdv-next-admin-thin-wails.exe
+Categories=Utility;
+StartupWMClass=antdv-next-admin-thin-wails.exe
+
+ 

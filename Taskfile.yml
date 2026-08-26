@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  APP_NAME: "antdv-next-admin-thin-wails"
+  BIN_DIR: "bin"
+  PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "pnpm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  # build/package/run 的目标 OS。默认使用当前主机 OS；跨平台编译时可通过
+  # `wails3 build GOOS=...`（或 GOOS 环境变量）覆盖。下面的 task 会通过此变量
+  # 分发到对应平台的 Taskfile。
+  GOOS: '{{.GOOS | default OS}}'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+  ios: ./build/ios/Taskfile.yml
+  android: ./build/android/Taskfile.yml
+
+tasks:
+  build:
+    summary: 构建应用
+    cmds:
+      - task: "{{.GOOS}}:build"
+
+  package:
+    summary: 打包应用的 production 构建
+    cmds:
+      - task: "{{.GOOS}}:package"
+
+  run:
+    summary: 运行应用
+    cmds:
+      - task: "{{.GOOS}}:run"
+
+  dev:
+    summary: 以 development 模式运行应用
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  setup:docker:
+    summary: 构建用于 cross-compilation 的 Docker image（约 800MB 下载）
+    cmds:
+      - task: common:setup:docker
+
+  build:server:
+    summary: 以 server 模式构建应用（无 GUI，仅 HTTP server）
+    cmds:
+      - task: common:build:server
+
+  run:server:
+    summary: 以 server 模式运行应用
+    cmds:
+      - task: common:run:server
+
+  build:docker:
+    summary: 构建用于 server 模式部署的 Docker image
+    cmds:
+      - task: common:build:docker
+
+  run:docker:
+    summary: 构建并运行 Docker image
+    cmds:
+      - task: common:run:docker

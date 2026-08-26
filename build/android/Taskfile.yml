@@ -1,0 +1,458 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  APP_ID: '{{.APP_ID | default "com.wails.app"}}'
+  MIN_SDK: '21'
+  TARGET_SDK: '35'
+  # emulator 使用 host architecture；physical device 为 arm64
+  HOST_ARCH:
+    sh: '[ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64"'
+  # host 使用的 System-image ABI，用于下方“create an AVD”提示。
+  ANDROID_ABI:
+    sh: '[ "$(uname -m)" = "arm64" ] && echo "arm64-v8a" || echo "x86_64"'
+  # SDK 位置：$ANDROID_HOME / $ANDROID_SDK_ROOT，否则使用各 OS 默认路径
+  # （macOS：~/Library/Android/sdk，Linux/其他系统：~/Android/Sdk）
+  SDK_ROOT:
+    sh: 'echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"'
+  ADB:
+    sh: 'command -v adb || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}/platform-tools/adb"'
+  EMULATOR:
+    sh: 'command -v emulator || echo "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}/emulator/emulator"'
+  # avdmanager 位于 cmdline-tools/<version>/bin 下；用于自动创建
+  # 不存在时的 AVD（与 iOS `ensure-simulator` 自动创建流程一致）。
+  AVDMANAGER:
+    sh: 'command -v avdmanager || ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$([ -d "$HOME/Library/Android/sdk" ] && echo "$HOME/Library/Android/sdk" || echo "$HOME/Android/Sdk")}}"/cmdline-tools/*/bin/avdmanager 2>/dev/null | sort -V | tail -1 || true'
+
+tasks:
+  install:deps:
+    summary: 检查并安装 Android 开发依赖
+    cmds:
+      - go run build/android/scripts/deps/install_deps.go
+    env:
+      TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
+    prompt: This will check and install Android development dependencies. Continue?
+
+  build:
+    summary: 为 Android 应用创建 debug build
+    deps:
+      - task: common:go:mod:tidy
+      - task: generate:android:overlay
+      - task: common:build:frontend
+        vars:
+          BUILD_FLAGS:
+            ref: .BUILD_FLAGS
+          PRODUCTION:
+            ref: .PRODUCTION
+    cmds:
+      - echo "Building Android app {{.APP_NAME}}..."
+      - task: compile:go:shared
+        vars:
+          ARCH: '{{.ARCH | default .HOST_ARCH}}'
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,android -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags android,debug -buildvcs=false -gcflags=all="-l"{{end}}'
+    env:
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  compile:go:shared:
+    summary: 将 Go code 编译为 shared library (.so)
+    cmds:
+      - |
+        # 定位 NDK：$ANDROID_NDK_HOME，或已安装的最新 NDK
+        NDK_ROOT="$ANDROID_NDK_HOME"
+        if [ -z "$NDK_ROOT" ]; then
+          SDK_ROOT="{{.SDK_ROOT}}"
+          NDK_ROOT=$(ls -d "$SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -1)
+        fi
+        if [ -z "$NDK_ROOT" ] || [ ! -d "$NDK_ROOT" ]; then
+          echo "Error: Android NDK not found"
+          echo "Install one with: sdkmanager 'ndk;26.3.11579264' (or set ANDROID_NDK_HOME)"
+          exit 1
+        fi
+
+        # 根据 host OS 确定 toolchain
+        case "$(uname -s)" in
+          Darwin) HOST_TAG="darwin-x86_64" ;;
+          Linux)  HOST_TAG="linux-x86_64" ;;
+          *)      echo "Unsupported host OS"; exit 1 ;;
+        esac
+
+        TOOLCHAIN="$NDK_ROOT/toolchains/llvm/prebuilt/$HOST_TAG"
+
+        # 根据 architecture 设置 compiler
+        case "{{.ARCH}}" in
+          arm64)
+            export CC="$TOOLCHAIN/bin/aarch64-linux-android{{.MIN_SDK}}-clang"
+            export CXX="$TOOLCHAIN/bin/aarch64-linux-android{{.MIN_SDK}}-clang++"
+            export GOARCH=arm64
+            JNI_DIR="arm64-v8a"
+            ;;
+          amd64|x86_64)
+            export CC="$TOOLCHAIN/bin/x86_64-linux-android{{.MIN_SDK}}-clang"
+            export CXX="$TOOLCHAIN/bin/x86_64-linux-android{{.MIN_SDK}}-clang++"
+            export GOARCH=amd64
+            JNI_DIR="x86_64"
+            ;;
+          *)
+            echo "Unsupported architecture: {{.ARCH}}"
+            exit 1
+            ;;
+        esac
+
+        export CGO_ENABLED=1
+        export GOOS=android
+
+        mkdir -p {{.BIN_DIR}}
+        mkdir -p build/android/app/src/main/jniLibs/$JNI_DIR
+
+        go build -buildmode=c-shared -overlay build/android/overlay.json {{.BUILD_FLAGS}} \
+          -o build/android/app/src/main/jniLibs/$JNI_DIR/libwails.so
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,android -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags android,debug -buildvcs=false -gcflags=all="-l"{{end}}'
+
+  compile:go:all-archs:
+    summary: 将 Go code 编译为所有 Android architecture（fat APK）
+    cmds:
+      - task: compile:go:shared
+        vars:
+          ARCH: arm64
+      - task: compile:go:shared
+        vars:
+          ARCH: amd64
+
+  package:
+    summary: 将 production build 打包为已签名的 release APK
+    desc: |
+      Builds for arm64 by default (covers 99%+ of real devices). Set ARCH=amd64
+      for emulator-only APKs, or use package:fat for a universal APK.
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: "true"
+          ARCH: '{{.ARCH | default "arm64"}}'
+    cmds:
+      - task: assemble:apk:release
+
+  package:fat:
+    summary: 将 production build 打包为所有 architecture（fat APK）
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: "true"
+          ARCH: arm64
+    cmds:
+      - task: compile:go:shared
+        vars:
+          ARCH: amd64
+          PRODUCTION: "true"
+      - task: assemble:apk:release
+
+  bundle:
+    summary: 将 production AAB 打包为 Play Store 提交的 Android App Bundle
+    desc: |
+      Builds for arm64 by default. Set ARCH=amd64 for emulator builds, or use
+      bundle:fat for a universal AAB.
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: "true"
+          ARCH: '{{.ARCH | default "arm64"}}'
+    cmds:
+      - task: assemble:aab:release
+
+  bundle:fat:
+    summary: 将 production AAB 打包为所有 architecture
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: "true"
+          ARCH: arm64
+    cmds:
+      - task: compile:go:shared
+        vars:
+          ARCH: amd64
+          PRODUCTION: "true"
+      - task: assemble:aab:release
+
+  assemble:apk:
+    summary: 使用 Gradle 组装 debug APK
+    preconditions:
+      - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
+        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+    cmds:
+      - |
+        cd build/android
+        # gradlew 从嵌入的 build assets 中提取时会丢失 exec bit，因此调用 wrapper 前恢复它。
+        chmod +x ./gradlew
+        ./gradlew assembleDebug
+        cp app/build/outputs/apk/debug/app-debug.apk "../../{{.BIN_DIR}}/{{.APP_NAME}}.apk"
+        echo "APK created: {{.BIN_DIR}}/{{.APP_NAME}}.apk"
+
+  assemble:apk:release:
+    summary: 使用 Gradle 组装 release APK（如果未设置 ANDROID_KEYSTORE_FILE，则使用 debug keystore 签名）
+    preconditions:
+      - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
+        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+    cmds:
+      - |
+        cd build/android
+        # gradlew 从嵌入的 build assets 中提取时会丢失 exec bit，因此调用 wrapper 前恢复它。
+        chmod +x ./gradlew
+        ./gradlew assembleRelease
+        cp app/build/outputs/apk/release/app-release.apk "../../{{.BIN_DIR}}/{{.APP_NAME}}.apk"
+        echo "Release APK created: {{.BIN_DIR}}/{{.APP_NAME}}.apk"
+
+  assemble:aab:
+    summary: 使用 Gradle 组装 debug AAB（Android App Bundle）
+    preconditions:
+      - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
+        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+    cmds:
+      - |
+        cd build/android
+        # gradlew 从嵌入的 build assets 中提取时会丢失 exec bit，因此调用 wrapper 前恢复它。
+        chmod +x ./gradlew
+        ./gradlew bundleDebug
+        cp app/build/outputs/bundle/debug/app-debug.aab "../../{{.BIN_DIR}}/{{.APP_NAME}}.aab"
+        echo "AAB created: {{.BIN_DIR}}/{{.APP_NAME}}.aab"
+
+  assemble:aab:release:
+    summary: 组装 release AAB，供 Play Store upload（如果未设置 ANDROID_KEYSTORE_FILE，则使用 debug keystore 签名）
+    preconditions:
+      - sh: 'command -v java >/dev/null || [ -n "$JAVA_HOME" ]'
+        msg: "Java not found. Install a JDK (e.g. brew install openjdk@21) and/or set JAVA_HOME"
+    cmds:
+      - |
+        # 使用 Play App Signing 时，此处配置的 keystore 是你的 UPLOAD
+        # key：Google 会使用它验证 upload，然后使用其管理的
+        # app signing key 为 distribution 重新签名。
+        if [ -z "$ANDROID_KEYSTORE_FILE" ]; then
+          echo "WARNING: ANDROID_KEYSTORE_FILE is not set, so this AAB will be"
+          echo "signed with the debug keystore. Google Play rejects debug-signed"
+          echo "bundles. Set ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD,"
+          echo "ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD before uploading."
+        fi
+        cd build/android
+        # gradlew 从嵌入的 build assets 中提取时会丢失 exec bit，因此调用 wrapper 前恢复它。
+        chmod +x ./gradlew
+        ./gradlew bundleRelease
+        cp app/build/outputs/bundle/release/app-release.aab "../../{{.BIN_DIR}}/{{.APP_NAME}}.aab"
+        echo "Release AAB created: {{.BIN_DIR}}/{{.APP_NAME}}.aab"
+
+  generate:android:overlay:
+    internal: true
+    summary: 生成注册 Android main 的 Go build overlay
+    sources:
+      - build/config.yml
+    generates:
+      - build/android/overlay.json
+      - build/android/gen/main_android.gen.go
+    cmds:
+      - wails3 android overlay:gen -out build/android/overlay.json -config build/config.yml
+
+  generate:android:bindings:
+    internal: true
+    summary: 为 Android 生成 bindings
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - frontend/bindings/**/*
+    cmds:
+      # Bindings 从 Go AST 生成；此步骤已禁用 CGO，因此不需要 NDK
+      - wails3 generate bindings -f '-tags android' -clean=true
+    env:
+      GOOS: android
+      CGO_ENABLED: 0
+
+  ensure-emulator:
+    internal: true
+    summary: 确保 Android Emulator 正在运行
+    silent: true
+    cmds:
+      - |
+        # 检查 emulator 是否已经运行
+        if "{{.ADB}}" devices | grep -q "emulator"; then
+          echo "Emulator already running"
+          exit 0
+        fi
+
+        # 获取第一个可用的 AVD
+        AVD_NAME=$("{{.EMULATOR}}" -list-avds | tail -1)
+        if [ -z "$AVD_NAME" ]; then
+          # 尚无 AVD。镜像 iOS `ensure-simulator` 流程，自动创建一个
+          # AVD，但仅使用已经安装的 system image。`run`
+          # task 不会触发 sdkmanager download（这会意外下载数 GB 内容并要求接受 license）。
+          # 选择与 host ABI 匹配的最高 API 已安装 image。
+          SDK_ROOT="{{.SDK_ROOT}}"
+          ABI="{{.ANDROID_ABI}}"
+          IMG=$(ls -d "$SDK_ROOT"/system-images/android-*/*/"$ABI" 2>/dev/null | sort -V | tail -1)
+          AVDMANAGER="{{.AVDMANAGER}}"
+          if [ -n "$IMG" ] && [ -x "$AVDMANAGER" ]; then
+            PKG="system-images;$(echo "$IMG" | sed "s|$SDK_ROOT/system-images/||" | tr '/' ';')"
+            echo "No Android Virtual Devices found. Creating 'wails' from $PKG..."
+            echo "no" | "$AVDMANAGER" create avd --name wails --package "$PKG" --device pixel_7 --force
+            AVD_NAME=wails
+          else
+            echo "No Android Virtual Devices found, and no system image is installed to create one from."
+            echo "Install a system image and create an AVD, e.g.:"
+            echo "  sdkmanager 'system-images;android-35;google_apis;$ABI'"
+            echo "  avdmanager create avd --name wails --package 'system-images;android-35;google_apis;$ABI' --device pixel_7"
+            exit 1
+          fi
+        fi
+
+        echo "Starting emulator: $AVD_NAME"
+        # 以 daemonized 方式启动 emulator，使其生命周期超出此 task step。go-task 的
+        # shell 会按 PID 跟踪 background job，并在 command
+        # interpreter 结束时回收它们（仅使用 nohup/setsid 也无法阻止这一点，因为 kill
+        # 是直接执行的），因此单独的 `emulator &` 会在后续
+        # install/launch step 执行前退出。通过一个短生命周期的 child shell 启动它，
+        # 让 child shell 将 emulator 放到 background 后立即退出：这样 emulator 会被
+        # reparent 到 init/launchd，go-task 的 shell 没有可回收它的 handle。
+        nohup sh -c "'{{.EMULATOR}}' -avd '$AVD_NAME' -no-snapshot-load </dev/null >/dev/null 2>&1 &" >/dev/null 2>&1
+
+        # 等待 emulator boot（最长 120 秒）
+        echo "Waiting for emulator to boot..."
+        "{{.ADB}}" wait-for-device
+
+        for i in $(seq 1 120); do
+          BOOT_COMPLETED=$("{{.ADB}}" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+          if [ "$BOOT_COMPLETED" = "1" ]; then
+            echo "Emulator booted successfully"
+            exit 0
+          fi
+          sleep 1
+        done
+
+        echo "Emulator boot timeout"
+        exit 1
+    preconditions:
+      - sh: '[ -x "{{.ADB}}" ] || command -v adb'
+        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+      - sh: '[ -x "{{.EMULATOR}}" ] || command -v emulator'
+        msg: "emulator not found. Install the Android SDK emulator package (or set ANDROID_HOME)"
+
+  deploy-emulator:
+    summary: 将打包的 release APK 部署到 Android Emulator
+    deps:
+      - task: package
+        vars:
+          ARCH: '{{.ARCH | default .HOST_ARCH}}'
+    cmds:
+      - task: ensure-emulator
+      - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
+      - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.APP_NAME}}.apk"'
+      - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
+
+  run:
+    summary: 构建、安装并在 Android Emulator 中启动 debug build
+    deps:
+      - task: ensure-emulator
+      - task: build
+    cmds:
+      - task: assemble:apk
+      - '"{{.ADB}}" uninstall {{.APP_ID}} 2>/dev/null || true'
+      - '"{{.ADB}}" install "{{.BIN_DIR}}/{{.APP_NAME}}.apk"'
+      - '"{{.ADB}}" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity'
+
+  device:list:
+    summary: 列出已连接的 Android device 和 emulator（serials）
+    cmds:
+      - '"{{.ADB}}" devices -l'
+
+  run:device:
+    summary: 构建、安装并在已连接的 physical Android device 上启动 debug build
+    deps:
+      - task: build
+        vars:
+          ARCH: arm64
+    cmds:
+      - task: assemble:apk
+      - |
+        DEVICE='{{.DEVICE_ID | default ""}}'
+        if [ -z "$DEVICE" ]; then
+          DEVICE="${DEVICE_ID:-}"
+        fi
+        if [ -z "$DEVICE" ]; then
+          DEVICE=$("{{.ADB}}" devices | awk 'NR > 1 && $2 == "device" && $1 !~ /^emulator-/ { print $1; exit }')
+        fi
+        if [ -z "$DEVICE" ]; then
+          echo "Error: no connected physical Android device found."
+          echo "Pass DEVICE_ID=<serial> to target a device explicitly."
+          echo "Find connected device serials with: {{.ADB}} devices"
+          exit 1
+        fi
+
+        echo "Deploying {{.BIN_DIR}}/{{.APP_NAME}}.apk to device $DEVICE..."
+        "{{.ADB}}" -s "$DEVICE" uninstall {{.APP_ID}} 2>/dev/null || true
+        "{{.ADB}}" -s "$DEVICE" install "{{.BIN_DIR}}/{{.APP_NAME}}.apk"
+        "{{.ADB}}" -s "$DEVICE" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity
+    preconditions:
+      - sh: '[ -x "{{.ADB}}" ] || command -v adb'
+        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+
+  deploy-device:
+    summary: 将打包的 release APK 部署到已连接的 physical Android device
+    deps:
+      - task: package
+        vars:
+          ARCH: arm64
+    cmds:
+      - |
+        DEVICE='{{.DEVICE_ID | default ""}}'
+        if [ -z "$DEVICE" ]; then
+          DEVICE="${DEVICE_ID:-}"
+        fi
+        if [ -z "$DEVICE" ]; then
+          DEVICE=$("{{.ADB}}" devices | awk 'NR > 1 && $2 == "device" && $1 !~ /^emulator-/ { print $1; exit }')
+        fi
+        if [ -z "$DEVICE" ]; then
+          echo "Error: no connected physical Android device found."
+          echo "Pass DEVICE_ID=<serial> to target a device explicitly."
+          echo "Find connected device serials with: {{.ADB}} devices"
+          exit 1
+        fi
+
+        echo "Deploying {{.BIN_DIR}}/{{.APP_NAME}}.apk to device $DEVICE..."
+        "{{.ADB}}" -s "$DEVICE" uninstall {{.APP_ID}} 2>/dev/null || true
+        "{{.ADB}}" -s "$DEVICE" install "{{.BIN_DIR}}/{{.APP_NAME}}.apk"
+        "{{.ADB}}" -s "$DEVICE" shell am start -n {{.APP_ID}}/com.wails.app.MainActivity
+    preconditions:
+      - sh: '[ -x "{{.ADB}}" ] || command -v adb'
+        msg: "adb not found. Install the Android SDK platform-tools (or set ANDROID_HOME)"
+
+  studio:
+    summary: 在 Android Studio 中打开生成的 Android project
+    cmds:
+      - |
+        if command -v studio >/dev/null 2>&1; then
+          studio build/android
+        elif [ -d "/Applications/Android Studio.app" ]; then
+          open -a "Android Studio" build/android
+        else
+          echo "Android Studio not found. Install it from https://developer.android.com/studio,"
+          echo "then open the build/android directory."
+          exit 1
+        fi
+
+  logs:
+    summary: 输出过滤为此应用的 Android logcat
+    cmds:
+      - '"{{.ADB}}" logcat -v time | grep -E "(Wails|{{.APP_NAME}})" || true'
+
+  logs:all:
+    summary: 输出全部 Android logcat（verbose）
+    cmds:
+      - '"{{.ADB}}" logcat -v time'
+
+  clean:
+    summary: 清理 build artifacts
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+      - rm -rf build/android/app/build
+      - rm -rf build/android/app/src/main/jniLibs/*/libwails.so
+      - rm -rf build/android/.gradle
