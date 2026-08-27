@@ -1,4 +1,4 @@
 [submodule "frontend"]
 	path = frontend
-	url = https://github.com/fdklgbh/antdv-next-admin-thin.git
+	url = git@github.com:fdklgbh/antdv-next-admin-thin.git
 	branch = no-auth-wails-v3
