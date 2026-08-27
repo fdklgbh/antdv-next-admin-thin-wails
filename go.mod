@@ -1,4 +1,4 @@
-module changeme
+module antdv-next-admin-thin-wails
 
 go 1.26.7
 
