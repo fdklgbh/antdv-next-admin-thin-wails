@@ -1,6 +1,6 @@
-module demo
+module antdv-next-admin-thin-wails-v2
 
-go 1.25.0
+go 1.26.7
 
 require github.com/wailsapp/wails/v2 v2.15.0
 
