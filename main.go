@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"antdv-next-admin-thin-wails/internal/system"
+
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -38,7 +40,7 @@ func main() {
 		Name:        "antdv-next-admin-thin-wails",
 		Description: "A demo of using raw HTML & CSS",
 		Services: []application.Service{
-			application.NewService(&GreetService{}),
+			application.NewService(&system.Service{}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
