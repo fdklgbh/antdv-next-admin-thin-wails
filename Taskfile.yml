@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+tasks:
+  dev:
+    desc: 以开发模式运行 Wails 应用
+    cmds:
+      - wails dev {{.CLI_ARGS}}
+
+  build:
+    desc: 构建单文件可执行程序
+    cmds:
+      - wails build -nopackage {{.CLI_ARGS}}
+
+  build:nsis:
+    desc: 构建 Windows NSIS 安装包
+    cmds:
+      - wails build -nsis -clean {{.CLI_ARGS}}
+
+  generate:
+    desc: 生成 Wails 前端绑定
+    cmds:
+      - wails generate module {{.CLI_ARGS}}
+
+  doctor:
+    desc: 检查 Wails 开发环境
+    cmds:
+      - wails doctor {{.CLI_ARGS}}
