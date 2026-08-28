@@ -1,6 +1,9 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 
 version: '3'
+vars:
+  # 打包通用参数
+  COMMON_BUILD_FLAGS: -clean -trimpath -ldflags="-s -w"
 
 tasks:
   dev:
@@ -11,12 +14,12 @@ tasks:
   build:
     desc: 构建单文件可执行程序
     cmds:
-      - wails build -nopackage {{.CLI_ARGS}}
+      - wails build -nopackage {{.COMMON_BUILD_FLAGS}} {{.CLI_ARGS}}
 
   build:nsis:
     desc: 构建 Windows NSIS 安装包
     cmds:
-      - wails build -nsis -clean {{.CLI_ARGS}}
+      - wails build -nsis {{.COMMON_BUILD_FLAGS}} {{.CLI_ARGS}}
 
   generate:
     desc: 生成 Wails 前端绑定
