@@ -58,8 +58,8 @@ func main() {
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "Antdv Next Admin Thin",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
-		Width:     1000,
-		Height:    618,
+		Width:     1024,
+		Height:    768,
 		Frameless: true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 50,
