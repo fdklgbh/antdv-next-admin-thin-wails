@@ -166,7 +166,7 @@ bin/                         构建产物
 不会因 push 或 PR 自动构建，也不会自动发布 Release。
 该文件需要先提交到远程默认分支，才能在 GitHub Actions 页面显示手动运行入口。
 
-在 **Actions → Build Wails v2 and v3 packages → Run workflow** 中填写：
+在 **Actions → 构建 Wails v2 和 v3 安装包 → Run workflow** 中填写：
 
 - `v3_ref`：默认 `master`，可指定 v3 分支、标签或提交。
 - `v2_ref`：默认 `wailsv2`，可指定 v2 分支、标签或提交。

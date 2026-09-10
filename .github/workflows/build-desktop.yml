@@ -1,4 +1,4 @@
-name: Build Wails v2 and v3 packages
+name: 构建 Wails v2 和 v3 安装包
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.wails }} / ${{ matrix.os }} / amd64
+    name: 构建 ${{ matrix.wails }} / ${{ matrix.os }} / amd64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -32,7 +32,7 @@ jobs:
         shell: bash
     env:
       CI: 'true'
-      # Pin build tools; Wails CLI and Go versions come from the selected go.mod.
+      # 固定构建工具版本；Wails CLI 和 Go 版本取自所选代码的 go.mod。
       TASK_VERSION: v3.51.1
       WAILS_MAJOR: ${{ matrix.wails }}
       BUILD_OS: ${{ matrix.os }}
@@ -40,36 +40,36 @@ jobs:
       GIT_COMMITTER_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
 
     steps:
-      - name: Checkout selected version and pinned public submodules
+      - name: 检出指定版本及固定提交的公开子模块
         uses: actions/checkout@v4
         with:
           ref: ${{ matrix.wails == 'v3' && inputs.v3_ref || inputs.v2_ref }}
           submodules: recursive
-          # Without ssh-key, checkout converts GitHub SSH submodule URLs to HTTPS.
+          # 未提供 ssh-key 时，checkout 会将 GitHub 子模块的 SSH 地址转换为 HTTPS。
           persist-credentials: false
 
-      - name: Set up Go from go.mod
+      - name: 按 go.mod 配置 Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Set up Node.js
+      - name: 配置 Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Set up pnpm
+      - name: 配置 pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 11.20.0
           run_install: false
 
-      - name: Locate pnpm store
+      - name: 获取 pnpm 缓存目录
         id: pnpm-store
         run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache frontend dependencies
+      - name: 缓存前端依赖
         uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
@@ -77,7 +77,7 @@ jobs:
           restore-keys: |
             pnpm-${{ runner.os }}-${{ runner.arch }}-11-
 
-      - name: Install Linux build and packaging dependencies
+      - name: 安装 Linux 构建和打包依赖
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -89,21 +89,21 @@ jobs:
             sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
           fi
 
-      - name: Install Windows installer tools
+      - name: 安装 Windows 安装包工具
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $nsisPath = Join-Path ${env:ProgramFiles(x86)} 'NSIS'
           if (-not (Test-Path (Join-Path $nsisPath 'makensis.exe'))) {
             choco install nsis --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+            if ($LASTEXITCODE -ne 0) { throw 'NSIS 安装失败' }
           }
           if (-not (Test-Path (Join-Path $nsisPath 'makensis.exe'))) {
-            throw 'makensis.exe was not found after installing NSIS'
+            throw '安装 NSIS 后未找到 makensis.exe'
           }
           $nsisPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install Task and matching Wails CLI
+      - name: 安装 Task 和匹配版本的 Wails CLI
         run: |
           go install "github.com/go-task/task/v3/cmd/task@$TASK_VERSION"
           wails_module="github.com/wailsapp/wails/$WAILS_MAJOR"
@@ -116,31 +116,31 @@ jobs:
           task --version
           {
             echo "### $WAILS_MAJOR / $BUILD_OS / amd64"
-            echo "- Backend commit: $(git rev-parse HEAD)"
-            echo "- Frontend commit: $(git -C frontend rev-parse HEAD)"
-            echo "- Wails CLI: $wails_version"
+            echo "- 后端提交： $(git rev-parse HEAD)"
+            echo "- 前端提交： $(git -C frontend rev-parse HEAD)"
+            echo "- Wails CLI 版本： $wails_version"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install locked frontend dependencies
+      - name: 按锁文件安装前端依赖
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Build executable and installer
+      - name: 构建单文件程序和安装包
         run: |
           if [[ "$WAILS_MAJOR" == v2 ]]; then
             task build:package
           elif [[ "$RUNNER_OS" == Windows ]]; then
             task package
           else
-            # Taskfile selects GTK3 for 22.04 and GTK4 for 24.04.
+            # Taskfile 为 Ubuntu 22.04 选择 GTK3，为 24.04 选择 GTK4。
             task linux:create:deb
           fi
 
-      - name: Check frontend types
+      - name: 检查前端类型
         working-directory: frontend
         run: pnpm run type-check
 
-      - name: Collect Windows EXE and NSIS installer
+      - name: 收集 Windows 单文件 EXE 和 NSIS 安装包
         if: runner.os == 'Windows'
         run: |
           output=bin
@@ -153,7 +153,7 @@ jobs:
           cp "$executable" "artifacts/$WAILS_MAJOR-windows-amd64.exe"
           cp "$installer" "artifacts/$WAILS_MAJOR-windows-amd64-installer.exe"
 
-      - name: Check deb and collect Linux executable
+      - name: 检查 deb 并收集 Linux 单文件程序
         if: runner.os == 'Linux'
         run: |
           output=bin
@@ -165,18 +165,18 @@ jobs:
           shopt -s nullglob
           packages=("$output"/*.deb)
           if [[ ${#packages[@]} -ne 1 ]]; then
-            echo "Expected exactly one deb, found ${#packages[@]}" >&2
+            echo "预期生成一个 deb，实际数量为 ${#packages[@]}" >&2
             exit 1
           fi
           dpkg-deb --info "${packages[0]}"
           dpkg-deb --contents "${packages[0]}"
           mkdir -p artifacts
           cp "${packages[0]}" "artifacts/$WAILS_MAJOR-$BUILD_OS-amd64.deb"
-          # GitHub artifact ZIPs do not preserve executable permissions.
+          # GitHub 构建产物 ZIP 不保留可执行权限，因此使用 tar.gz 封装单文件程序。
           tar -czf "artifacts/$WAILS_MAJOR-$BUILD_OS-amd64-standalone.tar.gz" \
             -C "$output" antdv-next-admin-thin-wails
 
-      - name: Upload both standalone and installer artifacts
+      - name: 上传单文件程序和安装包
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.wails }}-${{ matrix.os }}-amd64
