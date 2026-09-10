@@ -3,10 +3,6 @@ name: 构建 Wails v2 和 v3 安装包
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: '发布标签，例如 v1.0.0（使用尚未发布的新标签）'
-        required: true
-        type: string
       v3_ref:
         description: 'v3 分支、标签或提交'
         required: true
@@ -22,7 +18,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-release-${{ inputs.release_tag }}
+  group: desktop-release
   cancel-in-progress: false
 
 jobs:
@@ -225,12 +221,15 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ inputs.release_tag }}
       RELEASE_TARGET: ${{ github.sha }}
       V2_REF: ${{ inputs.v2_ref }}
       V3_REF: ${{ inputs.v3_ref }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      - name: 按北京时间生成发布标签
+        shell: bash
+        run: echo "RELEASE_TAG=$(TZ=Asia/Shanghai date +v%Y.%m.%d)" >> "$GITHUB_ENV"
+
       - name: 下载本次运行的六组构建产物
         uses: actions/download-artifact@v4
         with:
@@ -253,7 +252,38 @@ jobs:
           cd release-assets
           sha256sum -- *.exe *.deb *.tar.gz > SHA256SUMS.txt
 
-      - name: 创建草稿、上传完整附件后正式发布
+      - name: 删除当天已有的 Release 和标签
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            if (!/^v\d{4}\.\d{2}\.\d{2}$/.test(tag)) {
+              throw new Error(`发布标签格式不正确：${tag}`);
+            }
+            const repo = context.repo;
+            let previous;
+            try {
+              previous = await github.rest.repos.getReleaseByTag({ ...repo, tag });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (previous) {
+              await github.rest.repos.deleteRelease({ ...repo, release_id: previous.data.id });
+              core.info(`已删除当天旧 Release 及其附件：${tag}`);
+            }
+            // 同名标签也重新创建，确保指向本次工作流提交；处理上次失败留下的孤立标签。
+            let previousTag;
+            try {
+              previousTag = await github.rest.git.getRef({ ...repo, ref: `tags/${tag}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (previousTag) {
+              await github.rest.git.deleteRef({ ...repo, ref: `tags/${tag}` });
+              core.info(`已删除旧标签：${tag}`);
+            }
+
+      - name: 创建当天草稿、上传完整附件后正式发布
         shell: bash
         run: |
           {
@@ -265,7 +295,6 @@ jobs:
             printf '各任务实际构建的后端和前端提交见[构建记录](%s)。\n' "$RUN_URL"
             printf '\n发布标签默认指向本次工作流提交 `%s`；各版本源码以构建记录为准。\n' "$RELEASE_TARGET"
           } > release-notes.md
-          # 新建同名 Release 会报错，不覆盖既有发布或附件。
           # 上传失败时保留草稿，避免对外发布缺少附件的 Release。
           gh release create "$RELEASE_TAG" release-assets/* \
             --target "$RELEASE_TARGET" --title "$RELEASE_TAG" \
