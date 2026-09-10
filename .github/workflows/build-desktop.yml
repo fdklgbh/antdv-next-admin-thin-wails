@@ -109,7 +109,12 @@ jobs:
           wails_module="github.com/wailsapp/wails/$WAILS_MAJOR"
           wails_version=$(go list -m -f '{{.Version}}' "$wails_module")
           if [[ "$WAILS_MAJOR" == v3 ]]; then
-            go install "$wails_module/cmd/wails3@$wails_version"
+            if [[ "$BUILD_OS" == ubuntu-22.04 ]]; then
+              # CLI 本身也会编译 Linux 图形依赖，必须与已安装的 GTK3 开发库匹配。
+              go install -tags gtk3 "$wails_module/cmd/wails3@$wails_version"
+            else
+              go install "$wails_module/cmd/wails3@$wails_version"
+            fi
           else
             go install "$wails_module/cmd/wails@$wails_version"
           fi
@@ -144,11 +149,22 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           output=bin
-          if [[ "$WAILS_MAJOR" == v2 ]]; then output=build/bin; fi
-          executable="$output/antdv-next-admin-thin-wails.exe"
-          installer="$output/antdv-next-admin-thin-wails-amd64-installer.exe"
-          test -s "$executable"
-          test -s "$installer"
+          executable_name=antdv-next-admin-thin-wails
+          installer_name=antdv-next-admin-thin-wails
+          if [[ "$WAILS_MAJOR" == v2 ]]; then
+            output=build/bin
+            executable_name=$(node -p "require('./wails.json').outputfilename.replace(/\\.exe$/i, '')")
+            installer_name=$(node -p "require('./wails.json').name")
+          fi
+          executable="$output/$executable_name.exe"
+          installer="$output/$installer_name-amd64-installer.exe"
+          for file in "$executable" "$installer"; do
+            if [[ ! -s "$file" ]]; then
+              echo "缺少构建产物：$file" >&2
+              ls -la "$output"
+              exit 1
+            fi
+          done
           mkdir -p artifacts
           cp "$executable" "artifacts/$WAILS_MAJOR-windows-amd64.exe"
           cp "$installer" "artifacts/$WAILS_MAJOR-windows-amd64-installer.exe"
@@ -157,10 +173,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           output=bin
-          if [[ "$WAILS_MAJOR" == v2 ]]; then output=build/bin; fi
-          executable="$output/antdv-next-admin-thin-wails"
-          test -s "$executable"
-          test -x "$executable"
+          executable_name=antdv-next-admin-thin-wails
+          if [[ "$WAILS_MAJOR" == v2 ]]; then
+            output=build/bin
+            executable_name=$(node -p "require('./wails.json').outputfilename")
+          fi
+          executable="$output/$executable_name"
+          if [[ ! -s "$executable" || ! -x "$executable" ]]; then
+            echo "构建产物不存在、为空或不可执行：$executable" >&2
+            ls -la "$output"
+            exit 1
+          fi
           readelf -h "$executable"
           shopt -s nullglob
           packages=("$output"/*.deb)
@@ -174,7 +197,7 @@ jobs:
           cp "${packages[0]}" "artifacts/$WAILS_MAJOR-$BUILD_OS-amd64.deb"
           # GitHub 构建产物 ZIP 不保留可执行权限，因此使用 tar.gz 封装单文件程序。
           tar -czf "artifacts/$WAILS_MAJOR-$BUILD_OS-amd64-standalone.tar.gz" \
-            -C "$output" antdv-next-admin-thin-wails
+            -C "$output" "$executable_name"
 
       - name: 上传单文件程序和安装包
         uses: actions/upload-artifact@v4
