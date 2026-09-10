@@ -3,7 +3,7 @@
 version: '3'
 vars:
   # 打包通用参数
-  COMMON_BUILD_FLAGS: -clean -trimpath -ldflags="-s -w"
+  COMMON_BUILD_FLAGS: -trimpath -ldflags="-s -w"
 
 tasks:
   dev:
@@ -12,14 +12,49 @@ tasks:
       - wails dev {{.CLI_ARGS}}
 
   build:
-    desc: 构建单文件可执行程序
+    desc: 构建当前系统的单文件程序（包含图标资源）
     cmds:
-      - wails build -nopackage {{.COMMON_BUILD_FLAGS}} {{.CLI_ARGS}}
+      - task: 'build:{{OS}}'
 
-  build:nsis:
-    desc: 构建 Windows NSIS 安装包
+  build:windows:
+    internal: true
+    cmds:
+      - wails build {{.COMMON_BUILD_FLAGS}} {{.CLI_ARGS}}
+
+  build:linux:
+    internal: true
+    vars:
+      WEBKIT_TAG:
+        sh: 'if pkg-config --exists webkit2gtk-4.1; then echo webkit2_41; fi'
+    preconditions:
+      - sh: pkg-config --exists gtk+-3.0
+        msg: 请先安装 libgtk-3-dev 和 pkg-config
+      - sh: pkg-config --exists webkit2gtk-4.1 || pkg-config --exists webkit2gtk-4.0
+        msg: 请先安装 libwebkit2gtk-4.1-dev（或 Ubuntu 22.04 的 libwebkit2gtk-4.0-dev）
+    cmds:
+      - wails build {{.COMMON_BUILD_FLAGS}} {{if .WEBKIT_TAG}}-tags {{.WEBKIT_TAG}}{{end}} {{.CLI_ARGS}}
+
+  build:package:
+    desc: 构建当前系统安装包（Windows NSIS / Ubuntu deb）
+    cmds:
+      - task: 'package:{{OS}}'
+
+  package:windows:
+    internal: true
+    preconditions:
+      - sh: makensis -VERSION
+        msg: 请先安装 NSIS，并将 makensis 加入 PATH
     cmds:
       - wails build -nsis {{.COMMON_BUILD_FLAGS}} {{.CLI_ARGS}}
+
+  package:linux:
+    internal: true
+    preconditions:
+      - sh: command -v python3 && command -v dpkg-deb && command -v readelf
+        msg: 请先安装 python3、dpkg-dev 和 binutils
+    cmds:
+      - task: build:linux
+      - python3 build/linux/package.py
 
   generate:
     desc: 生成 Wails 前端绑定

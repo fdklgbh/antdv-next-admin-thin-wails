@@ -1,9 +1,15 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "antdv-next-admin-thin-wails",
-  "outputfilename": "antdv-next-admin-thin-wails",
+  "name": "antdv-next-admin-thin-wails-v2",
+  "outputfilename": "antdv-next-admin-thin-wails-v2",
   "frontend:install": "pnpm install",
   "frontend:build": "pnpm run build",
   "frontend:dev:watcher": "pnpm run dev",
-  "frontend:dev:serverUrl": "auto"
+  "frontend:dev:serverUrl": "auto",
+  "info": {
+    "companyName": "fdklgbh",
+    "productName": "Antdv Next Thin V2",
+    "productVersion": "1.0.0",
+    "comments": "Antdv Next Admin desktop application"
+  }
 }
