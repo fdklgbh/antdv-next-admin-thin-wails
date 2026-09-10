@@ -185,6 +185,9 @@ bin/                         构建产物
 
 每个任务检出所选后端提交及其记录的前端子模块提交，不追踪子模块分支最新版本。
 公开 GitHub 子模块的 SSH 地址由 checkout 自动转换为 HTTPS，无需额外 SSH 密钥或 PAT。
+前端的 `pnpm-workspace.yaml` 必须提交到对应子模块分支，其中 `allowBuilds` 显式允许
+`@parcel/watcher` 的构建脚本。只在本地执行 `pnpm approve-builds` 而未提交配置，会导致 CI 安装失败。
+修改该配置后，先提交并推送前端子模块，再更新对应后端分支记录的子模块提交。
 构建摘要记录实际后端、前端提交及 Wails CLI 版本。工作流安装 NSIS 或对应 GTK/WebKit 开发库，
 调用现有 Taskfile 构建并上传产物；通过 CI 构建不等于已经完成安装包及窗口行为实测。
 
