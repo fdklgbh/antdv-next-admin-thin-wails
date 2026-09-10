@@ -160,6 +160,36 @@ bin/                         构建产物
 
 ## 检查
 
+### GitHub Actions 手动打包 v2 / v3
+
+工作流位于 `.github/workflows/build-desktop.yml`，仅通过 `workflow_dispatch` 手动触发，
+不会因 push 或 PR 自动构建，也不会自动发布 Release。
+该文件需要先提交到远程默认分支，才能在 GitHub Actions 页面显示手动运行入口。
+
+在 **Actions → Build Wails v2 and v3 packages → Run workflow** 中填写：
+
+- `v3_ref`：默认 `master`，可指定 v3 分支、标签或提交。
+- `v2_ref`：默认 `wailsv2`，可指定 v2 分支、标签或提交。
+
+一次运行并行执行 6 个 amd64 任务，单个失败不会取消其他任务：
+
+| 系统 | v2 产物 | v3 产物 |
+| --- | --- | --- |
+| Windows Server 2022 runner | 单文件 EXE + NSIS 安装包 | 单文件 EXE + NSIS 安装包 |
+| Ubuntu 22.04 | GTK3 单文件程序 + deb | GTK3 单文件程序 + deb |
+| Ubuntu 24.04 | GTK3 单文件程序 + deb | GTK4 单文件程序 + deb |
+
+在运行详情的 **Artifacts** 下载对应版本和系统的文件，保留 14 天。
+每份 artifact 同时包含单文件程序与安装包；Linux 单文件程序封装为 `*-standalone.tar.gz`，
+解压后保留可执行权限。deb、EXE、安装包名称包含 v2/v3 和系统标识，避免相互覆盖。
+
+每个任务检出所选后端提交及其记录的前端子模块提交，不追踪子模块分支最新版本。
+公开 GitHub 子模块的 SSH 地址由 checkout 自动转换为 HTTPS，无需额外 SSH 密钥或 PAT。
+构建摘要记录实际后端、前端提交及 Wails CLI 版本。工作流安装 NSIS 或对应 GTK/WebKit 开发库，
+调用现有 Taskfile 构建并上传产物；通过 CI 构建不等于已经完成安装包及窗口行为实测。
+
+### 本地检查
+
 Go 静态检查：
 
 ```sh
