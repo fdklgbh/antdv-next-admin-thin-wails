@@ -24,24 +24,24 @@ contents:
   - src: "./build/linux/antdv-next-admin-thin-wails.desktop"
     dst: "/usr/share/applications/antdv-next-admin-thin-wails.desktop"
 
-# Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
+# GTK3 + WebKit2GTK 4.1，与 Linux Taskfile 的 gtk3 构建标签保持一致。
 depends:
-  - libgtk-4-1
-  - libwebkitgtk-6.0-4
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
 
 # Distribution-specific overrides for different package formats
 overrides:
   # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
   rpm:
     depends:
-      - gtk4
-      - webkitgtk6.0
+      - gtk3
+      - webkit2gtk4.1
 
   # Arch Linux packages
   archlinux:
     depends:
-      - gtk4
-      - webkitgtk-6.0
+      - gtk3
+      - webkit2gtk-4.1
 
 # scripts section to ensure desktop database is updated after install
 scripts:
@@ -50,4 +50,4 @@ scripts:
   # preremove: "./build/linux/nfpm/scripts/preremove.sh"
   # postremove: "./build/linux/nfpm/scripts/postremove.sh"
 
-# Ubuntu 22.04 使用单独的 nfpm-gtk3.yaml，由 Linux Taskfile 自动选择。
+# Wails v3.0.x 保留 GTK3 兼容模式；升级 v3.1 时需重新评估构建标签和运行依赖。

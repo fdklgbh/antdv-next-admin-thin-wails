@@ -1,59 +1,178 @@
-# Welcome to Your New Wails3 Project!
+# Antdv Next Admin Thin · Wails v3
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+基于 Wails v3、Vue 3 和 Antdv Next 的桌面管理后台脚手架。前端资源内嵌于可执行文件，使用系统 WebView 渲染界面。
 
-## Getting Started
+当前 Go 依赖为 **Wails v3.0.0-beta.19**。本 README 对应 v3 项目，构建配置入口为 `Taskfile.yml` 和 `build/config.yml`。
 
-1. Navigate to your project directory in the terminal.
+## 环境准备
 
-2. To run your application in development mode, use the following command:
+- Go：满足 `go.mod` 声明的版本（当前为 `1.26.7`）。
+- Node.js：推荐 22.12+，以及 pnpm。
+- Task：提供 `task` 命令。
+- Wails v3 CLI：建议与项目依赖保持同版本。
 
-   ```
-   wails3 dev
-   ```
+```sh
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.19
+```
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+确保 Go 的 bin 目录在 PATH 中，并按下文安装目标系统的原生依赖。
+构建任务会安装前端依赖、构建前端及生成所需资源；前端默认使用 pnpm。
 
-3. To build your application for production, use:
+## 开发与常用命令
 
-   ```
-   wails3 build
-   ```
+在项目根目录执行：
 
-   This will create a production-ready executable in the `build` directory.
+| 命令 | 用途 |
+| --- | --- |
+| `task dev` | 启动开发模式及热更新，前端端口默认 9245 |
+| `task build` | 为当前系统构建生产程序 |
+| `task run` | 运行已构建的程序 |
+| `task package` | 为当前系统构建并生成安装包 |
+| `task linux:create:deb` | 构建 Linux 程序并仅生成 deb |
 
-## Exploring Wails3 Features
+修改开发端口：`task dev WAILS_VITE_PORT=9246`。
+需要调试构建时使用 `task build DEV=true`；指定架构使用 `ARCH=amd64` 或 `ARCH=arm64`。
+常规 Windows/Linux 产物输出到 **`bin/`**，不是 `build/bin/`。
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+## Windows
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+运行需要 Microsoft Edge WebView2 Runtime。构建 NSIS 安装包还需要安装 NSIS，并将 `makensis` 加入 PATH。
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+```sh
+# 带图标、版本信息和 manifest 的单文件 EXE
+task build
 
-   ```
-   go run .
-   ```
+# NSIS 安装包（默认安装到计算机范围）
+task package
 
-   Note: Some examples may be under development during the alpha phase.
+# 仅为当前用户安装的 NSIS 包
+task package INSTALL_SCOPE=user
+```
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+主要产物：
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+- `bin/antdv-next-admin-thin-wails.exe`
+- `bin/antdv-next-admin-thin-wails-amd64-installer.exe`（ARM64 对应 `arm64`）
 
-## Project Structure
+安装包包含 WebView2 引导安装流程，缺少运行环境时可能需要联网。
+EXE 内嵌前端资源，但“单文件”不表示同时内嵌完整的 WebView2 Runtime。
 
-Take a moment to familiarize yourself with your project structure:
+项目包含 Windows 最小化恢复后的客户区重算处理，解决最大化窗口最小化再打开后的界面比例异常；其他系统使用空实现。
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+## Ubuntu 22.04 / 24.04
 
-## Next Steps
+Linux Taskfile 读取 `/etc/os-release`，自动选择后端，并同步选择安装包依赖：
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+| 构建系统 | 后端 | deb 配置 |
+| --- | --- | --- |
+| Ubuntu 22.04 | GTK3 + WebKit2GTK 4.1 | `build/linux/nfpm/nfpm-gtk3.yaml` |
+| Ubuntu 24.04 | GTK4 + WebKitGTK 6.0（Wails 默认） | `build/linux/nfpm/nfpm.yaml` |
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+### 安装开发依赖
+
+Ubuntu 22.04：
+
+```sh
+sudo apt update
+sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+```
+
+Ubuntu 24.04：
+
+```sh
+sudo apt update
+sudo apt install build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+```
+
+### 构建与打包
+
+在对应 Ubuntu 系统上执行相同命令：
+
+```sh
+# 单文件 ELF 程序
+task build
+
+# 构建程序并生成 deb
+task linux:create:deb
+```
+
+运行单文件程序：
+
+```sh
+./bin/antdv-next-admin-thin-wails
+```
+
+deb 也输出到 `bin/`，文件名由包名、版本、release 和架构组成。
+使用 `sudo apt install ./bin/<实际文件名>.deb` 安装，以便同时解析系统运行依赖。
+当前两份 nFPM 配置中的版本为 `0.1.0`。
+
+- `task package` 会依次生成 AppImage、deb、RPM 和 Arch 包；只要 deb 时使用 `task linux:create:deb`。
+- deb 由 `wails3 tool package` 生成，不需要额外 Python 打包脚本。
+- 开发与生产构建使用同一后端选择规则；其他系统默认 GTK4。
+- 显式覆盖时使用 `task build GTK_VERSION=3` 或 `task linux:create:deb GTK_VERSION=4`。
+  `GTK_VERSION` 同时控制编译标签和包依赖，不要仅通过 `EXTRA_TAGS=gtk3` 切换。
+
+请分别在目标 Ubuntu 系统上原生构建和验证。24.04 构建的程序不保证能在 22.04 上运行，
+因为 GTK 后端和 glibc 等系统库版本可能不同。当前 Ubuntu 22.04 / 24.04 的实际构建、安装及运行仍待验证。
+按当前 Wails 说明，GTK3 兼容模式将在 v3.1 移除，升级时需要重新评估 22.04 支持。
+
+## 图标与包信息
+
+- `build/appicon.png`：源图标；当前为 1024×1024。
+- `build/windows/icon.ico`：由图标任务生成，用于 Windows EXE 和 NSIS 安装包。
+- `build/linux/antdv-next-admin-thin-wails.desktop`：Linux 构建生成的应用菜单入口。
+- 两份 nFPM 配置将程序安装到 `/usr/bin/`，将桌面入口和图标安装到系统应用目录及 hicolor 图标主题目录。
+
+Linux 裸 ELF 在文件管理器中的图标由桌面环境决定，不能像 Windows EXE 一样保证显示自定义文件图标；
+deb 安装后通过应用菜单入口关联图标。
+
+`build/config.yml` 保存 Wails 产品信息；Windows 资源还涉及 `build/windows/info.json` 和 NSIS 配置。
+Linux 包版本、维护者及依赖以两份 nFPM 配置为准。发布前需将模板中的公司、产品和维护者信息改为实际值，
+并同步维护两份 nFPM 的版本。维护者字段使用 `GIT_COMMITTER_NAME` 和 `GIT_COMMITTER_EMAIL` 环境变量。
+
+## 跨平台构建
+
+优先在目标系统原生构建。Linux 需要 CGO；从非 Linux 系统、缺少 C 编译器或跨架构构建时，现有任务会使用 Docker：
+
+```sh
+task setup:docker
+task build GOOS=linux ARCH=amd64 GTK_VERSION=4
+```
+
+现有交叉编译镜像基于 Debian 13。`GTK_VERSION` 只选择图形后端，不会改变镜像的 glibc 等系统库基线，
+因此不能据此保证 Docker 产物兼容 Ubuntu 22.04 或 24.04。
+
+## 项目结构
+
+```text
+frontend/                    Vue 前端及测试
+internal/system/             系统服务
+main.go                      应用入口与窗口配置
+window_restore_windows.go    Windows 窗口恢复处理
+window_restore_other.go      其他平台的对应空实现
+Taskfile.yml                 开发、构建和打包入口
+build/config.yml             Wails 产品及开发模式配置
+build/Taskfile.yml           前端、绑定、图标等共用任务
+build/windows/               Windows 资源及安装包配置
+build/linux/                 Linux 构建、桌面入口及 nFPM 配置
+bin/                         构建产物
+```
+
+## 检查
+
+Go 静态检查：
+
+```sh
+go vet ./...
+```
+
+前端检查（在 `frontend/` 中运行）：
+
+```sh
+pnpm run lint
+pnpm run type-check
+pnpm run test:unit:run
+pnpm run build:check
+```
+
+Wails v3 文档：[v3.wails.io](https://v3.wails.io/)。
