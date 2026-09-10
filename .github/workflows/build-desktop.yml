@@ -3,6 +3,10 @@ name: 构建 Wails v2 和 v3 安装包
 on:
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: '发布标签，例如 v1.0.0（使用尚未发布的新标签）'
+        required: true
+        type: string
       v3_ref:
         description: 'v3 分支、标签或提交'
         required: true
@@ -16,6 +20,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: desktop-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -206,3 +214,61 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: 汇总产物并发布 Release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_TARGET: ${{ github.sha }}
+      V2_REF: ${{ inputs.v2_ref }}
+      V3_REF: ${{ inputs.v3_ref }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: 下载本次运行的六组构建产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: v*-*-amd64
+          path: release-assets
+          merge-multiple: true
+
+      - name: 校验十二个发布附件并生成校验和
+        shell: bash
+        run: |
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          for version in v2 v3; do
+            test -s "release-assets/$version-windows-amd64.exe"
+            test -s "release-assets/$version-windows-amd64-installer.exe"
+            for system in ubuntu-22.04 ubuntu-24.04; do
+              test -s "release-assets/$version-$system-amd64.deb"
+              test -s "release-assets/$version-$system-amd64-standalone.tar.gz"
+            done
+          done
+          cd release-assets
+          sha256sum -- *.exe *.deb *.tar.gz > SHA256SUMS.txt
+
+      - name: 创建草稿、上传完整附件后正式发布
+        shell: bash
+        run: |
+          {
+            printf '本次发布包含 Wails v2 和 v3 的 amd64 程序及安装包。\n\n'
+            printf -- '- Windows：单文件 EXE、NSIS 安装包。\n'
+            printf -- '- Ubuntu 22.04 / 24.04：deb、保留可执行权限的单文件 tar.gz。\n'
+            printf -- '- SHA256SUMS.txt：附件 SHA-256 校验和。\n\n'
+            printf 'v2 构建引用：`%s`\n\nv3 构建引用：`%s`\n\n' "$V2_REF" "$V3_REF"
+            printf '各任务实际构建的后端和前端提交见[构建记录](%s)。\n' "$RUN_URL"
+            printf '\n发布标签默认指向本次工作流提交 `%s`；各版本源码以构建记录为准。\n' "$RELEASE_TARGET"
+          } > release-notes.md
+          # 新建同名 Release 会报错，不覆盖既有发布或附件。
+          # 上传失败时保留草稿，避免对外发布缺少附件的 Release。
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --target "$RELEASE_TARGET" --title "$RELEASE_TAG" \
+            --notes-file release-notes.md --draft
+          gh release edit "$RELEASE_TAG" --draft=false
+          gh release view "$RELEASE_TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

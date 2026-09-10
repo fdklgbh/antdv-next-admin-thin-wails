@@ -163,11 +163,12 @@ bin/                         构建产物
 ### GitHub Actions 手动打包 v2 / v3
 
 工作流位于 `.github/workflows/build-desktop.yml`，仅通过 `workflow_dispatch` 手动触发，
-不会因 push 或 PR 自动构建，也不会自动发布 Release。
+不会因 push 或 PR 自动构建；手动运行后，六组构建全部成功才会汇总发布到同一个 GitHub Release。
 该文件需要先提交到远程默认分支，才能在 GitHub Actions 页面显示手动运行入口。
 
 在 **Actions → 构建 Wails v2 和 v3 安装包 → Run workflow** 中填写：
 
+- `release_tag`：必填，例如 `v1.0.0`，使用尚未发布的新标签。
 - `v3_ref`：默认 `master`，可指定 v3 分支、标签或提交。
 - `v2_ref`：默认 `wailsv2`，可指定 v2 分支、标签或提交。
 
@@ -180,6 +181,10 @@ bin/                         构建产物
 | Ubuntu 24.04 | GTK3 单文件程序 + deb | GTK4 单文件程序 + deb |
 
 在运行详情的 **Artifacts** 下载对应版本和系统的文件，保留 14 天。
+全部构建成功后，Release 中也会提供十二个程序／安装包附件和 `SHA256SUMS.txt`，不受 Artifacts 的 14 天保留期限制。
+发布任务单独使用 `contents: write`，先创建草稿并上传附件，再正式发布；不会覆盖同名 Release。
+上传失败留下草稿时，检查并处理该草稿后再重跑发布任务。新标签默认指向触发工作流的提交，
+v2、v3 的实际源码提交分别记录在构建摘要中。发布标签不会自动改写应用内的产品版本号。
 每份 artifact 同时包含单文件程序与安装包；Linux 单文件程序封装为 `*-standalone.tar.gz`，
 解压后保留可执行权限。deb、EXE、安装包名称包含 v2/v3 和系统标识，避免相互覆盖。
 
