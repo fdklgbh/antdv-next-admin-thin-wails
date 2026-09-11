@@ -9,8 +9,9 @@ import (
 
 type Service struct{}
 
-// IsUbuntu22 checks the running system, not the machine used to build the app.
-func (*Service) IsUbuntu22() (bool, error) {
+// ShouldDisableThemeTransitions checks the running system for WebKit versions
+// that can leave the window blank during animated theme changes.
+func (*Service) ShouldDisableThemeTransitions() (bool, error) {
 	if runtime.GOOS != "linux" {
 		return false, nil
 	}
@@ -35,7 +36,7 @@ func (*Service) IsUbuntu22() (bool, error) {
 			version = value
 		}
 	}
-	return id == "ubuntu" && (version == "22" || strings.HasPrefix(version, "22.")), nil
+	return id == "ubuntu" && (version == "22" || strings.HasPrefix(version, "22.") || version == "24.04"), nil
 }
 
 func (*Service) CurrentUsername() (string, error) {

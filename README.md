@@ -196,6 +196,10 @@ sudo aa-status | grep -F antdv-next-admin-thin-wails-installed
 
 ### 设置抽屉花屏：Linux WebKit 渲染方案
 
+Ubuntu 22 系列和 24.04 的主题切换直接应用明暗颜色，跳过圆形 View Transition 和全局颜色渐变，
+规避切换后窗口持续白屏的问题。Go 根据运行机器的 `/etc/os-release` 判断，前端挂载前读取结果；
+Windows 和其他系统保留原有主题动画。此处理独立于下方 GPU 策略以及 AppArmor 启动权限配置。
+
 如果打开设置抽屉时出现画面重复、压缩或错位，可对比以下两种方案。此类现象可能与
 WebKitGTK、显卡驱动或显示环境的合成渲染有关，仅凭截图不能确认根因；两种方案均需在目标 Ubuntu 上验证。
 
