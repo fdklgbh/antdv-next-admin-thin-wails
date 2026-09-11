@@ -9,6 +9,11 @@
 产品信息统一维护在 `build/config.yml`。Taskfile 读取配置，Linux 打包任务通过环境变量
 传给 nFPM；主程序内嵌同一配置，启动时读取窗口标题和程序标识，因此修改后必须重新构建。
 
+Wails beta.19 内置的 Task 不支持 `mustFromYaml`，因此构建、打包和开发统一使用独立
+`task`。`build/config.yml` 的三个开发子进程也调用独立 `task`，不使用 Wails 内置 Task。
+根 Taskfile 声明最低版本 `3.51.1`，版本不足会在执行任务前报错并停止，无需额外检查脚本。
+Ubuntu 22.04 / 24.04 使用同一规则，GTK 后端仍按下文规则选择。
+
 | 配置字段 | 用途 |
 | --- | --- |
 | `packaging.appName` | 各平台构建输出基名、Linux 包名、程序标识、desktop 文件名及图标关联、Windows NSIS 安装器文件名 |
@@ -48,7 +53,7 @@ Windows 构建会自动生成 `bin/windows-info.json` 并用于 `.syso`，NSIS �
 
 - Go：满足 `go.mod` 声明的版本（当前为 `1.26.7`）。
 - Node.js：推荐 22.12+，以及 pnpm。
-- Task：提供 `task` 命令。
+- Task：3.51.1 或更新的兼容 3.x 版本，`task` 必须在 PATH 中。
 - Wails v3 CLI：建议与项目依赖保持同版本。
 
 ```sh
@@ -56,6 +61,9 @@ go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.19
 ```
 
 确保 Go 的 bin 目录在 PATH 中，并按下文安装目标系统的原生依赖。
+可用 `task --version` 检查版本；安装已验证版本使用
+`go install github.com/go-task/task/v3/cmd/task@v3.51.1`。
+日常使用 `task dev`、`task build`、`task package`，不要使用 `wails3 build/package/task`。
 构建任务会安装前端依赖、构建前端及生成所需资源；前端默认使用 pnpm。
 
 ## 开发与常用命令

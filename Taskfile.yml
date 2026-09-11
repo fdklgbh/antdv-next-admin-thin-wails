@@ -1,4 +1,5 @@
-version: '3'
+# 使用独立 Task 3.51.1+；通过 Task 自带的版本检查限制最低版本。
+version: '3.51.1'
 
 vars:
   PROJECT_CONFIG:
@@ -18,7 +19,7 @@ vars:
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "pnpm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # build/package/run 的目标 OS。默认使用当前主机 OS；跨平台编译时可通过
-  # `wails3 build GOOS=...`（或 GOOS 环境变量）覆盖。下面的 task 会通过此变量
+  # `task build GOOS=...`（或 GOOS 环境变量）覆盖。下面的 task 会通过此变量
   # 分发到对应平台的 Taskfile。
   GOOS: '{{.GOOS | default OS}}'
 
