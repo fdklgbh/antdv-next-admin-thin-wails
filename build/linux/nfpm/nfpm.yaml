@@ -17,6 +17,13 @@ license: "MIT"
 release: "${APP_RELEASE}"
 
 contents:
+  - src: "./${APP_BIN_DIR}/${APP_NAME}.apparmor"
+    dst: "/etc/apparmor.d/${APP_NAME}-installed"
+    type: config
+    packager: deb
+    expand: true
+    file_info:
+      mode: 0o644
   - src: "./${APP_BIN_DIR}/${APP_NAME}"
     dst: "/usr/bin/${APP_NAME}"
     expand: true
@@ -37,6 +44,15 @@ depends:
 
 # Distribution-specific overrides for different package formats
 overrides:
+  deb:
+    depends:
+      - libgtk-4-1
+      - libwebkitgtk-6.0-4
+      - apparmor (>= 4.0)
+    scripts:
+      postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
+      preremove: "./build/linux/nfpm/scripts/preremove-deb.sh"
+      postremove: "./build/linux/nfpm/scripts/postremove-deb.sh"
   # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
   rpm:
     depends:

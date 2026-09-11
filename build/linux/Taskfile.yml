@@ -188,7 +188,31 @@ tasks:
       GOARCH: '{{.ARCH | default ARCH}}'
     summary: 创建 deb package
     cmds:
+      - task: generate:apparmor
       - wails3 tool package -name "{{.APP_NAME}}" -format deb -config "{{.NFPM_CONFIG}}" -out {{.ROOT_DIR}}/bin
+
+  generate:apparmor:
+    desc: 生成 GTK4 deb 的应用专用 AppArmor 规则
+    # GTK3 包不携带 AppArmor 4 语法，保持 Ubuntu 22.04 兼容。
+    status:
+      - '{{if eq .GTK_VERSION "3"}}true{{else}}false{{end}}'
+    preconditions:
+      - sh: |
+          case "$APP_NAME" in
+            ''|*[!a-z0-9+.-]*) exit 1 ;;
+          esac
+        msg: APP_NAME 必须使用 Debian 包名允许的小写字母、数字、加号、点或连字符
+    cmds:
+      - mkdir -p "{{.ROOT_DIR}}/{{.BIN_DIR}}"
+      - 'echo {{.PROFILE | shellQuote}} > "{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.apparmor"'
+    vars:
+      PROFILE: |
+        abi <abi/4.0>,
+        include <tunables/global>
+
+        profile {{.APP_NAME}}-installed "/usr/bin/{{.APP_NAME}}" flags=(unconfined) {
+          userns,
+        }
 
   generate:rpm:
     env:

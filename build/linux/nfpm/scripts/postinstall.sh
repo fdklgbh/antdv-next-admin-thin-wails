@@ -1,5 +1,16 @@
 #!/bin/sh
 
+# dpkg supplies the package name; other package formats do not load this profile.
+# GTK3 packages have no profile, so Ubuntu 22.04 never parses AppArmor 4 syntax.
+if [ "${1:-}" = "configure" ] && [ -n "${DPKG_MAINTSCRIPT_PACKAGE:-}" ]; then
+  profile="/etc/apparmor.d/${DPKG_MAINTSCRIPT_PACKAGE}-installed"
+  if [ -f "$profile" ] && [ -r /sys/module/apparmor/parameters/enabled ] &&
+      [ "$(cat /sys/module/apparmor/parameters/enabled)" = "Y" ]; then
+    # Read the current policy rather than a potentially stale compiled cache.
+    apparmor_parser -r -T "$profile" || exit 1
+  fi
+fi
+
 # Refresh the theme cache; pixmaps also supplies an unthemed lookup fallback.
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   gtk-update-icon-cache -f -t /usr/share/icons/hicolor

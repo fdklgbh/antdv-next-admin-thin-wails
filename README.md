@@ -164,6 +164,36 @@ deb 也输出到 `bin/`，当前 Wails 打包命令生成 `<appName>.deb`，版�
 因为 GTK 后端和 glibc 等系统库版本可能不同。当前 Ubuntu 22.04 / 24.04 的实际构建、安装及运行仍待验证。
 按当前 Wails 说明，GTK3 兼容模式将在 v3.1 移除，升级时需要重新评估 22.04 支持。
 
+### Ubuntu 24.04：deb 自动配置 AppArmor
+
+GTK4 deb 会安装 `/etc/apparmor.d/<appName>-installed`，只为
+`/usr/bin/<appName>` 及继承该配置的子进程允许创建用户命名空间。规则使用
+`flags=(unconfined)` 和 `userns`，用于解决 WebKit 启动时报
+`bwrap: setting up uid map: Permission denied`、`Failed to fully launch dbus-proxy`。
+它不关闭全局 AppArmor，也不禁用 WebKit 沙箱。
+
+`task linux:create:deb` 会按 `packaging.appName` 自动生成规则，GTK4 deb 声明
+`apparmor (>= 4.0)` 依赖。安装或升级时，若系统已启用 AppArmor，维护脚本自动加载新规则；
+加载失败会报告安装错误，不会假装配置成功。重启后由 AppArmor 服务加载规则。
+GTK3 deb 不携带该规则，也不增加 AppArmor 4 依赖，因此 Ubuntu 22.04 的打包方式不变。
+RPM、Arch 包也不包含这条 deb 专用规则。
+
+重新打包并安装后即可从应用菜单启动：
+
+```sh
+task --force linux:create:deb
+sudo apt install --reinstall ./bin/antdv-next-admin-thin-wails.deb
+sudo aa-status | grep -F antdv-next-admin-thin-wails-installed
+```
+
+上面使用默认应用名，改名后请替换对应文件名。规则不覆盖 Downloads 或开发目录里的裸程序。
+之前按本文排查步骤手动创建的 `-installed` 规则使用同一名称；若 dpkg 提示配置文件冲突，
+对未自行定制的旧规则可选择安装维护者提供的新版本。Downloads 对应的 `-local` 规则不会被修改。
+
+`apt remove` 会卸载内核中的规则并按 Debian 惯例保留配置；`apt purge` 会清理配置文件和
+可能重新加载的规则。升级过程中不卸载规则。应用的进程仍需退出后重新启动，才能应用新权限。
+该流程已做包结构和脚本检查，AppArmor 内核行为仍需在目标 Ubuntu 上验证。
+
 ### 设置抽屉花屏：Linux WebKit 渲染方案
 
 如果打开设置抽屉时出现画面重复、压缩或错位，可对比以下两种方案。此类现象可能与
