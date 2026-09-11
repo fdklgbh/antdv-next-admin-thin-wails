@@ -209,13 +209,57 @@ WebviewGpuPolicy: application.WebviewGpuPolicyNever,
 
 ## 图标与包信息
 
-- `build/appicon.png`：源图标；当前为 1024×1024。
+- `build/appicon.png`：原生 AN 图标，来自 `frontend/public/logo.png`，当前为 256×256。
 - `build/windows/icon.ico`：由图标任务生成，用于 Windows EXE 和 NSIS 安装包。
+- 更换品牌图标时同步页面 Logo 和原生 PNG，再生成 ICO；两份 nFPM 的 hicolor 目录尺寸应与 PNG 一致。
 - `build/linux/antdv-next-admin-thin-wails.desktop`：Linux 构建生成的应用菜单入口。
 - 两份 nFPM 配置将程序安装到 `/usr/bin/`，将桌面入口和图标安装到系统应用目录及 hicolor 图标主题目录。
 
 Linux 裸 ELF 在文件管理器中的图标由桌面环境决定，不能像 Windows EXE 一样保证显示自定义文件图标；
 deb 安装后通过应用菜单入口关联图标。
+
+### 替换图标并重新打包（Windows / Ubuntu）
+
+1. 准备同一套品牌图片：将页面 Logo 放到 `frontend/public/logo.png`，将方形 PNG 放到
+   `build/appicon.png`。原生 PNG 推荐 256×256；只替换前端 Logo 不会改变系统图标。
+2. 若原生 PNG 尺寸变化，同步修改 `build/linux/nfpm/nfpm.yaml` 和 `nfpm-gtk3.yaml` 中
+   `hicolor/<宽>x<高>/apps/` 的目录，保持与图片实际尺寸一致。保留 pixmaps 安装项和安装后缓存刷新。
+3. 生成派生图标，并在目标系统重新构建。不要仅重命名 PNG 的扩展名来制作 ICO。
+
+```sh
+# 强制由 build/appicon.png 重新生成 ICO / ICNS
+task --force common:generate:icons
+
+# Windows：生成带新图标的 EXE；需要安装包再执行第二条
+task --force build
+task --force package
+```
+
+在 Ubuntu 项目根目录重新生成并安装 deb：
+
+```sh
+task --force linux:create:deb
+sudo apt install --reinstall ./bin/antdv-next-admin-thin-wails.deb
+```
+
+以上文件名按默认 `packaging.appName` 编写，修改名称后使用自己的实际文件名。
+跨机器打包时，必须同步 PNG、两份 nFPM 配置及相关源码后，在 Ubuntu 重新执行打包命令。
+`sync-to-ubuntu.bat` 同步的是源码，不会自动重新构建远端 `bin/` 中的旧 deb。
+
+若安装后仍显示旧图标，先核对源文件、包内文件和已安装文件，不要直接认定是缓存：
+
+```sh
+sha256sum build/appicon.png
+dpkg-deb -c bin/antdv-next-admin-thin-wails.deb | grep -E 'png|desktop'
+dpkg-deb --fsys-tarfile bin/antdv-next-admin-thin-wails.deb \
+  | tar -xOf - ./usr/share/pixmaps/antdv-next-admin-thin-wails.png | sha256sum
+sha256sum /usr/share/pixmaps/antdv-next-admin-thin-wails.png
+```
+
+三处 PNG 的 SHA256 应一致。源文件与包内不一致说明 deb 未更新或打包目录不对；
+包内与已安装文件不一致说明尚未安装该包。安装后完全退出旧进程，再从应用菜单启动。
+文件都一致但固定图标仍旧时，取消固定后重新固定；Ubuntu 必要时注销后重新登录。
+Windows 同样需要运行新 EXE 或重新安装新安装包，已运行的旧进程不会自动换图标。
 
 `build/config.yml` 保存 Wails 产品信息；Windows 资源还涉及 `build/windows/info.json` 和 NSIS 配置。
 Linux 包版本、维护者等产品信息读取 `build/config.yml`，系统依赖仍由两份 nFPM 配置维护。

@@ -196,24 +196,21 @@ tasks:
       - '"{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}"'
 
   sign:
-    summary: 使用 Developer ID 为应用 bundle 签名
-    desc: |
-      Signs the .app bundle for distribution.
-      Uses signing identity from `wails3 setup` (stored in ~/.config/wails/defaults.yaml).
-      Override with: task darwin:sign -- --identity "Developer ID Application: ..."
+    desc: 使用 Developer ID 签署 macOS 应用
+    summary: |
+      为分发的 .app 应用包签名。使用 wails3 setup 中配置的签名身份，
+      配置保存于 ~/.config/wails/defaults.yaml。
+      覆盖方式：task darwin:sign -- --identity "Developer ID Application: ..."
     deps:
       - task: package
     cmds:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.app" {{.CLI_ARGS}}
 
   sign:notarize:
-    summary: 为应用 bundle 签名并执行 notarization
-    desc: |
-      Signs the .app bundle and submits it for notarization.
-      Uses signing identity and keychain profile from `wails3 setup`.
-
-      First-time setup:
-        wails3 setup
+    desc: 签署 macOS 应用并提交公证
+    summary: |
+      使用 wails3 setup 配置的签名身份和钥匙串配置，为 .app 应用签名并提交公证。
+      首次使用前执行：wails3 setup
     deps:
       - task: package
     cmds:

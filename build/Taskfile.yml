@@ -236,16 +236,12 @@ tasks:
       - wails3 update build-assets -name "{{.APP_NAME}}" -binaryname "{{.APP_NAME}}" -config config.yml -dir .
 
   build:server:
-    summary: 以 server 模式构建应用（无 GUI，仅 HTTP server）
-    desc: |
-      Builds a production server binary by default: -tags server,production,
-      -trimpath and a stripped binary, mirroring the desktop `build` task.
-      Server mode runs as a pure HTTP server without native GUI dependencies.
-
-      Usage: task build:server [DEV=true] [OBFUSCATED=true] [EXTRA_TAGS=tag1,tag2]
-        DEV=true        development server (-tags server, no strip, inlining kept)
-        OBFUSCATED=true obfuscated build via garble (requires garble installed)
-        EXTRA_TAGS      additional comma-separated build tags
+    desc: 构建服务端程序（无图形界面，仅 HTTP 服务）
+    summary: |
+      默认使用 server,production 标签构建生产程序，裁剪路径并移除调试信息。
+      用法：task build:server [DEV=true] [OBFUSCATED=true] [EXTRA_TAGS=tag1,tag2]
+      DEV=true 保留开发调试信息；OBFUSCATED=true 使用已安装的 garble 混淆构建；
+      EXTRA_TAGS 用于附加以逗号分隔的构建标签。
     deps:
       - task: build:frontend
         vars:
@@ -273,14 +269,12 @@ tasks:
       - '"./{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}"'
 
   build:docker:
-    summary: 构建用于 server 模式部署的 Docker image
-    desc: |
-      Creates a minimal Docker image containing the production server binary.
-      Defaults to a pure-Go static binary on a distroless/static base. The
-      production frontend is built first so the embedded assets are current.
-
-      Usage: task build:docker [TAG=myapp:latest] [CGO_ENABLED=1] [GO_IMAGE=...] [RUNTIME_IMAGE=...]
-      For CGO apps, set CGO_ENABLED=1 with libc-compatible builder/runtime images, e.g.:
+    desc: 构建服务端 Docker 镜像
+    summary: |
+      先构建生产前端，再生成包含服务端程序的精简 Docker 镜像。
+      默认使用纯 Go 静态程序和 distroless/static 基础镜像。
+      用法：task build:docker [TAG=myapp:latest] [CGO_ENABLED=1] [GO_IMAGE=...] [RUNTIME_IMAGE=...]
+      启用 CGO 时，构建和运行镜像的 libc 必须兼容，例如：
         task build:docker CGO_ENABLED=1 GO_IMAGE=golang:bookworm RUNTIME_IMAGE=gcr.io/distroless/base-debian12
     deps:
       # 构建 production frontend，使 frontend/dist（由 image 内的 Go build
@@ -307,13 +301,11 @@ tasks:
         msg: "Dockerfile.server not found. Run 'wails3 update build-assets' to generate it."
 
   run:docker:
-    summary: 构建并运行 Docker image
-    desc: |
-      Builds the Docker image and runs it, exposing port 8080.
-      Usage: task run:docker [TAG=myapp:latest] [PORT=8080]
-      Note: The internal container port is always 8080. The PORT variable
-      only changes the host port mapping. Ensure your app uses port 8080
-      or modify the Dockerfile to match your ServerOptions.Port setting.
+    desc: 构建并运行 Docker 镜像，默认开放 8080 端口
+    summary: |
+      用法：task run:docker [TAG=myapp:latest] [PORT=8080]
+      容器内部端口固定为 8080，PORT 只改变主机端口映射。
+      应用应监听 8080，或修改 Dockerfile 以匹配 ServerOptions.Port。
     deps:
       - task: build:docker
         vars:
@@ -326,10 +318,9 @@ tasks:
       PORT: "{{.PORT}}"
 
   setup:docker:
-    summary: 构建用于 cross-compilation 的 Docker image（约 800MB 下载）
-    desc: |
-      Builds the Docker image needed for cross-compiling to any platform.
-      Run this once to enable cross-platform builds from any OS.
+    desc: 构建跨平台编译所需的 Docker 镜像
+    summary: |
+      首次使用交叉编译前执行一次，可在不同主机系统上构建目标平台程序。
     cmds:
       - docker build -t wails-cross -f build/docker/Dockerfile.cross build/docker/
     preconditions:

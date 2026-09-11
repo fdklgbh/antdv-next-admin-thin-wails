@@ -21,7 +21,7 @@ contents:
     dst: "/usr/bin/${APP_NAME}"
     expand: true
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/1024x1024/apps/${APP_NAME}.png"
+    dst: "/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
     expand: true
   - src: "./build/appicon.png"
     dst: "/usr/share/pixmaps/${APP_NAME}.png"

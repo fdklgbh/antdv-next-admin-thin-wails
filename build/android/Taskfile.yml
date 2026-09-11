@@ -123,10 +123,10 @@ tasks:
           ARCH: amd64
 
   package:
-    summary: 将 production build 打包为已签名的 release APK
-    desc: |
-      Builds for arm64 by default (covers 99%+ of real devices). Set ARCH=amd64
-      for emulator-only APKs, or use package:fat for a universal APK.
+    desc: 构建 Android 发布版 APK（默认 arm64）
+    summary: |
+      默认构建 arm64，覆盖绝大多数实体设备。
+      设置 ARCH=amd64 可构建模拟器专用 APK，使用 package:fat 可构建多架构 APK。
     deps:
       - task: build
         vars:
@@ -150,10 +150,10 @@ tasks:
       - task: assemble:apk:release
 
   bundle:
-    summary: 将 production AAB 打包为 Play Store 提交的 Android App Bundle
-    desc: |
-      Builds for arm64 by default. Set ARCH=amd64 for emulator builds, or use
-      bundle:fat for a universal AAB.
+    desc: 构建用于提交 Play Store 的 AAB（默认 arm64）
+    summary: |
+      默认构建 arm64，设置 ARCH=amd64 可构建模拟器版本，
+      使用 bundle:fat 可构建多架构 AAB。
     deps:
       - task: build
         vars:
