@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -10,10 +11,25 @@ import tempfile
 
 def main():
     project = Path(__file__).resolve().parents[2]
-    config = json.loads((project / "wails.json").read_text(encoding="utf-8"))
+    # Wails dev -save serializes the top-level Info/Author keys with capitals.
+    config = {
+        key.lower(): value
+        for key, value in json.loads((project / "wails.json").read_text(encoding="utf-8")).items()
+    }
+    packaging = json.loads((project / "build/linux/package.json").read_text(encoding="utf-8"))
     name = config["name"]
     info = config["info"]
-    version = info["productVersion"]
+    author = config["author"]
+    version = f"{info['productVersion']}-{packaging['release']}"
+    if not re.fullmatch(r"[a-z0-9][a-z0-9+.-]+", name):
+        raise ValueError("wails.json name must be a valid Debian package name")
+    # Values are written to line-oriented control and desktop files.
+    for value in [info['productName'], info['comments'], author['name'], author['email'],
+                  version, *packaging.values()]:
+        if not isinstance(value, str) or not value.strip() or any(c in value for c in "\r\n\x00"):
+            raise ValueError("Package metadata must contain non-empty single-line strings")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", config["outputfilename"]):
+        raise ValueError("Linux outputfilename must be a simple lowercase executable name")
     output = project / "build" / "bin"
     binary = output / config["outputfilename"]
     if not binary.is_file():
@@ -42,7 +58,7 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="deb-", dir=output) as temporary:
         root = Path(temporary)
-        executable = root / "usr" / "bin" / name
+        executable = root / "usr" / "bin" / config["outputfilename"]
         executable.parent.mkdir(parents=True)
         shutil.copyfile(binary, executable)
         executable.chmod(0o755)
@@ -63,8 +79,9 @@ def main():
         desktop.parent.mkdir(parents=True)
         desktop.write_text(
             "[Desktop Entry]\nType=Application\n"
-            f"Name={info['productName']}\nExec=/usr/bin/{name}\nIcon={name}\n"
-            f"StartupWMClass={name}\nTerminal=false\nCategories=Office;\n",
+            f"Name={info['productName']}\nExec=/usr/bin/{config['outputfilename']}\nIcon={name}\n"
+            f"Comment={info['comments']}\nStartupWMClass={name}\nTerminal=false\n"
+            f"Categories={packaging['categories']}\n",
             encoding="utf-8",
         )
         desktop.chmod(0o644)
@@ -73,11 +90,11 @@ def main():
         control.parent.mkdir()
         control.write_text(
             f"Package: {name}\nVersion: {version}\nArchitecture: {arch}\n"
-            "Section: utils\nPriority: optional\n"
-            "Maintainer: fdklgbh <fdklgbh@users.noreply.github.com>\n"
+            f"Section: {packaging['section']}\nPriority: {packaging['priority']}\n"
+            f"Maintainer: {author['name']} <{author['email']}>\n"
+            f"Homepage: {packaging['homepage']}\n"
             f"Depends: libc6, libgtk-3-0t64 | libgtk-3-0, {webkit}\n"
-            f"Description: {info['productName']}\n"
-            " Desktop administration application built with Wails.\n",
+            f"Description: {info['productName']}\n {info['comments']}\n",
             encoding="utf-8",
         )
         control.chmod(0o644)

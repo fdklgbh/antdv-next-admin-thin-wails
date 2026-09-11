@@ -6,10 +6,15 @@
   "frontend:build": "pnpm run build",
   "frontend:dev:watcher": "pnpm run dev",
   "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "fdklgbh",
+    "email": "fdklgbh@users.noreply.github.com"
+  },
   "info": {
     "companyName": "fdklgbh",
     "productName": "Antdv Next Thin V2",
     "productVersion": "1.0.0",
+    "copyright": "(c) 2026, fdklgbh",
     "comments": "Antdv Next Admin desktop application"
   }
 }
