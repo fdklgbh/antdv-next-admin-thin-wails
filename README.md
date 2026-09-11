@@ -67,6 +67,8 @@ to this in your browser, and you can call your Go code from devtools.
 
 Windows 打包安装包前需安装 NSIS，并将 `makensis` 加入 `PATH`。
 EXE 和安装包使用 `build/windows/icon.ico`；不要添加 `-nopackage`，否则会跳过 EXE 资源打包。
+当前原生 PNG 和 Windows ICO 均使用与 `frontend/public/logo.png` 相同的 AN 标志。
+更换品牌图标时应同步这三处；只替换页面 Logo 不会更新任务栏、窗口或安装包图标。
 
 Ubuntu 24.04 构建依赖：
 
@@ -82,6 +84,53 @@ Ubuntu 22.04 可使用 `libwebkit2gtk-4.0-dev`。构建自动优先选择已安�
 请在目标 Ubuntu 版本和架构上构建，不将单个 deb 视为跨所有 Ubuntu 版本通用。
 
 Linux 图标来自 `build/appicon.png`，内嵌于程序；deb 还会安装 `.desktop` 菜单入口和
-hicolor 图标。裸 ELF 在文件管理器中通常显示系统默认可执行文件图标，无法像 Windows
+hicolor 图标和 `/usr/share/pixmaps/` 图标，并在安装后刷新图标缓存和桌面数据库。
+更新此打包逻辑后需重新生成并安装 deb；已有安装不会自动获得新增图标文件。
+裸 ELF 在文件管理器中通常显示系统默认可执行文件图标，无法像 Windows
 EXE 一样仅靠内嵌资源设置文件图标；安装 deb 后可从应用菜单使用带图标的入口。
 “单文件”表示无需外置前端资源，仍需系统的 WebView2（Windows）或 GTK/WebKit（Ubuntu）运行环境。
+
+## 替换图标并重新打包（Windows / Ubuntu）
+
+1. 将页面 Logo 替换为 `frontend/public/logo.png`，将相同品牌的方形 PNG 放到
+   `build/appicon.png`，推荐 256×256。只替换前端 Logo 不会改变任务栏、窗口或安装包图标。
+2. Windows 还需更新 `build/windows/icon.ico`。使用图标转换工具生成包含
+   16、32、48、64、128、256 像素尺寸的 ICO；不能只把 PNG 扩展名改为 `.ico`。
+   也可以先备份并移走旧 ICO，再在 Windows 执行 `task build`，让 Wails v2 从 PNG 自动生成。
+   已存在的 ICO 不会因为 PNG 改变而自动更新。
+3. Linux 打包脚本会读取 PNG 实际尺寸，自动设置 hicolor 目录，并将同一图片安装到 pixmaps；
+   无需手动填写图片尺寸。重新生成 deb 后才能更新已安装图标。
+
+Windows 项目根目录执行：
+
+```sh
+task build
+# 需要 NSIS 安装包时执行
+task build:package
+```
+
+Ubuntu 项目根目录执行：
+
+```sh
+task build:package
+sudo apt install --reinstall ./build/bin/antdv-next-admin-thin-wails-v2_1.0.0-1_amd64.deb
+```
+
+包名由 `wails.json` 的 `name`、`info.productVersion` 和 `build/linux/package.json` 的
+`release` 以及实际架构决定；上面是当前默认示例，应以本次生成文件为准。
+跨机器构建时先同步源码和图标，再在 Ubuntu 打包，不能重复安装同步前生成的旧 deb。
+
+若图标仍旧，可在 Ubuntu 对照检查（将 deb 文件名替换为实际名称）：
+
+```sh
+sha256sum build/appicon.png
+dpkg-deb -c build/bin/antdv-next-admin-thin-wails-v2_1.0.0-1_amd64.deb | grep -E 'png|desktop'
+dpkg-deb --fsys-tarfile build/bin/antdv-next-admin-thin-wails-v2_1.0.0-1_amd64.deb \
+  | tar -xOf - ./usr/share/pixmaps/antdv-next-admin-thin-wails-v2.png | sha256sum
+sha256sum /usr/share/pixmaps/antdv-next-admin-thin-wails-v2.png
+```
+
+三处 PNG 的 SHA256 应一致。源文件与包内不一致时重新打包；包内与安装路径不一致时重新安装。
+更改 `name` 后也要同步替换上述安装路径。安装完成后完全退出旧程序，再从应用菜单启动。
+文件一致但固定图标仍旧时，取消固定后重新固定；Ubuntu 必要时注销后重新登录。
+Windows 需运行新 EXE 或重新安装新安装包，旧进程不会自动更新图标。

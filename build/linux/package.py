@@ -75,6 +75,12 @@ def main():
         icon.write_bytes(png)
         icon.chmod(0o644)
 
+        # Supply an unthemed fallback for desktops that do not find this hicolor size.
+        pixmap = root / "usr/share/pixmaps" / f"{name}.png"
+        pixmap.parent.mkdir(parents=True)
+        pixmap.write_bytes(png)
+        pixmap.chmod(0o644)
+
         desktop = root / "usr/share/applications" / f"{name}.desktop"
         desktop.parent.mkdir(parents=True)
         desktop.write_text(
@@ -98,6 +104,18 @@ def main():
             encoding="utf-8",
         )
         control.chmod(0o644)
+        postinst = root / "DEBIAN/postinst"
+        postinst.write_text(
+            "#!/bin/sh\nset -e\n"
+            "if command -v gtk-update-icon-cache >/dev/null 2>&1; then\n"
+            "  gtk-update-icon-cache -f -t /usr/share/icons/hicolor\n"
+            "fi\n"
+            "if command -v update-desktop-database >/dev/null 2>&1; then\n"
+            "  update-desktop-database -q /usr/share/applications\n"
+            "fi\n",
+            encoding="utf-8",
+        )
+        postinst.chmod(0o755)
         # TemporaryDirectory defaults to 0700; package directories must be traversable.
         for directory, _, _ in os.walk(root):
             Path(directory).chmod(0o755)
