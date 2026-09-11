@@ -1,20 +1,29 @@
 # This file contains the configuration for this project.
-# When you update `info` or `fileAssociations`, run `wails3 task common:update:build-assets` to update the assets.
-# Note that this will overwrite any changes you have made to the assets.
+# Windows EXE/NSIS 和 Linux 打包自动读取下方产品信息。
+# 其他平台或 fileAssociations 变更需要更新对应资源；common:update:build-assets
+# 会覆盖定制构建资源，使用时必须检查差异，不要覆盖当前 Taskfile 和 nFPM 配置。
 version: '3'
 
 # This information is used to generate the build assets.
 info:
   companyName: "My Company" # The name of the company
-  productName: "My Product" # The name of the application
+  productName: "Antdv Next Admin Thin" # 窗口标题及 Linux 应用菜单显示名称
   productIdentifier: "com.mycompany.myproduct" # The unique product identifier
-  description: "A program that does X" # The application description
+  description: "A desktop admin application" # The application description
   copyright: "(c) 2025, My Company" # Copyright text
   comments: "Some Product Comments" # Comments
-  version: "0.0.1" # The application version
+  version: "0.1.0" # The application version
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"
+
+# 项目打包配置：Taskfile 读取并传递给 Linux nFPM；不改变 Go 模块名。
+packaging:
+  appName: "antdv-next-admin-thin-wails" # 程序、包和图标标识；使用小写字母、数字和连字符
+  homepage: "https://wails.io"
+  maintainer: "My Company <maintainer@example.com>" # 发布前替换为实际维护者
+  release: "1" # 同一应用版本的打包修订号
+  categories: "Development;" # freedesktop 应用菜单分类，以分号结尾
 
 # iOS build configuration (uncomment to customise iOS project generation)
 # Note: Keys under `ios` OVERRIDE values under `info` when set.

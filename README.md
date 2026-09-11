@@ -4,6 +4,46 @@
 
 当前 Go 依赖为 **Wails v3.0.0-beta.19**。本 README 对应 v3 项目，构建配置入口为 `Taskfile.yml` 和 `build/config.yml`。
 
+## 复用项目：集中配置名称与包信息
+
+产品信息统一维护在 `build/config.yml`。Taskfile 读取配置，Linux 打包任务通过环境变量
+传给 nFPM；主程序内嵌同一配置，启动时读取窗口标题和程序标识，因此修改后必须重新构建。
+
+| 配置字段 | 用途 |
+| --- | --- |
+| `packaging.appName` | 各平台构建输出基名、Linux 包名、程序标识、desktop 文件名及图标关联、Windows NSIS 安装器文件名 |
+| `info.productName` | 窗口标题、Linux 应用菜单显示名称、Windows 产品名称 |
+| `info.version` | Linux 包版本、Windows EXE 和 NSIS 产品版本；建议使用 `1.2.3` 三段数字 |
+| `info.description` | 应用描述、Linux 包和桌面入口描述、Windows 文件描述 |
+| `info.companyName` | Linux vendor、Windows 公司名称 |
+| `info.copyright` / `info.comments` | Windows 版权和备注 |
+| `packaging.maintainer` | Linux 维护者，格式为 `姓名 <邮箱>`，不再依赖 Git 提交者环境变量 |
+| `packaging.homepage` | Linux 包主页 |
+| `packaging.release` | Linux 打包修订号，例如同一应用版本的第 `1` 次打包 |
+| `packaging.categories` | Linux 应用菜单分类，例如 `Development;`，以分号结尾 |
+| `info.productIdentifier` | Wails 平台资源生成使用的产品标识，复用时应更换为自己的反向域名 |
+
+复制项目后，修改上述字段并替换 `build/appicon.png`，再运行 `task build` 或对应打包命令。
+`packaging.appName` 使用小写字母、数字和连字符，不使用空格或路径分隔符；中文和空格用于
+`info.productName`。字段应使用单行文本，发布前替换默认公司、主页及维护者占位信息。
+
+Windows 构建会自动生成 `bin/windows-info.json` 并用于 `.syso`，NSIS 通过命令参数读取同一份
+配置；旧 `build/windows/info.json` 不再用于常规 EXE 构建。Linux 两份 nFPM 配置都读取相同的
+环境变量，GTK3/GTK4 的依赖仍分别维护。请通过 Task 打包，直接运行 nFPM/Wails 打包子命令时
+需要自行提供环境变量。`task --silent config:show` 输出名称和产物目录的 JSON，CI 用它定位 v3 产物。
+
+仍需单独检查的内容：
+
+- 两份 nFPM 配置中的 `license`、`section`、`priority`：当前 nFPM 不对这些字段展开环境变量，
+  不要直接写成 `${APP_LICENSE}`。若变更许可证，还应同步项目许可证文件。
+- macOS、iOS、Android、MSIX 等既有平台资源未在本次接入自动同步。修改产品标识后按对应平台
+  更新资源并验证；`task common:update:build-assets` 会覆盖构建资源，不能不经检查就用它覆盖当前定制任务和包配置。
+- Go 模块名、Go import、前端生成绑定路径及前端自己的标题/版本不由上述打包名称自动重命名。
+  前端是独立子模块，应按其指南修改并重新生成绑定。
+- GitHub Release 日期标签属于发布工作流，不会替代 `info.version`。
+
+这里只集中产品与打包元数据，仍需在目标 Ubuntu 和 Windows 上验证安装及运行。
+
 ## 环境准备
 
 - Go：满足 `go.mod` 声明的版本（当前为 `1.26.7`）。
@@ -102,9 +142,9 @@ task linux:create:deb
 ./bin/antdv-next-admin-thin-wails
 ```
 
-deb 也输出到 `bin/`，文件名由包名、版本、release 和架构组成。
+deb 也输出到 `bin/`，当前 Wails 打包命令生成 `<appName>.deb`，版本和架构记录在包元数据中。
 使用 `sudo apt install ./bin/<实际文件名>.deb` 安装，以便同时解析系统运行依赖。
-当前两份 nFPM 配置中的版本为 `0.1.0`。
+包版本读取 `build/config.yml` 的 `info.version`，当前为 `0.1.0`。
 
 - `task package` 会依次生成 AppImage、deb、RPM 和 Arch 包；只要 deb 时使用 `task linux:create:deb`。
 - deb 由 `wails3 tool package` 生成，不需要额外 Python 打包脚本。
@@ -115,6 +155,49 @@ deb 也输出到 `bin/`，文件名由包名、版本、release 和架构组成�
 请分别在目标 Ubuntu 系统上原生构建和验证。24.04 构建的程序不保证能在 22.04 上运行，
 因为 GTK 后端和 glibc 等系统库版本可能不同。当前 Ubuntu 22.04 / 24.04 的实际构建、安装及运行仍待验证。
 按当前 Wails 说明，GTK3 兼容模式将在 v3.1 移除，升级时需要重新评估 22.04 支持。
+
+### 设置抽屉花屏：Linux WebKit 渲染方案
+
+如果打开设置抽屉时出现画面重复、压缩或错位，可对比以下两种方案。此类现象可能与
+WebKitGTK、显卡驱动或显示环境的合成渲染有关，仅凭截图不能确认根因；两种方案均需在目标 Ubuntu 上验证。
+
+#### 方案一：仅关闭 DMA-BUF 渲染路径，保留 GPU 加速
+
+先将 `main.go` 中 `application.LinuxWindow` 的 GPU 策略改为：
+
+```go
+WebviewGpuPolicy: application.WebviewGpuPolicyAlways,
+```
+
+重新构建，再通过环境变量启动：
+
+```sh
+task build
+WEBKIT_DISABLE_DMABUF_RENDERER=1 ./bin/antdv-next-admin-thin-wails
+
+# 若测试 deb 安装的程序，需先重新打包并安装上述配置的版本
+WEBKIT_DISABLE_DMABUF_RENDERER=1 /usr/bin/antdv-next-admin-thin-wails
+```
+
+该变量只作用于本次启动，不会自动应用到应用菜单启动。它关闭 DMA-BUF 渲染路径，
+不等于关闭全部硬件加速，适合优先排查部分驱动、虚拟机或 Wayland 环境的兼容问题。
+实际支持及效果取决于系统 WebKitGTK 版本。当前默认策略为 `Never`，只设置环境变量不会重新启用 GPU，
+因此对比前必须修改上述策略并重新构建。
+
+#### 方案二：完全禁用 WebView GPU 加速（当前默认）
+
+当前 `main.go` 在 `application.LinuxWindow` 中显式设置：
+
+```go
+WebviewGpuPolicy: application.WebviewGpuPolicyNever,
+```
+
+此方案使用软件渲染，规避 WebView GPU 合成路径的兼容问题，无需额外环境变量；
+可能增加 CPU 占用，并影响复杂动画或图形内容的性能。该配置仅作用于 Linux 窗口。
+
+从方案一切回时，将策略恢复为 `Never`，重新执行 `task build`；需要 deb 时执行
+`task linux:create:deb` 并重新安装。两种方案都应验证设置抽屉的打开、关闭和滚动，
+以及窗口缩放后的显示效果；当前尚未完成目标 Ubuntu 环境的实际验证。
 
 ## 图标与包信息
 
@@ -127,8 +210,8 @@ Linux 裸 ELF 在文件管理器中的图标由桌面环境决定，不能像 Wi
 deb 安装后通过应用菜单入口关联图标。
 
 `build/config.yml` 保存 Wails 产品信息；Windows 资源还涉及 `build/windows/info.json` 和 NSIS 配置。
-Linux 包版本、维护者及依赖以两份 nFPM 配置为准。发布前需将模板中的公司、产品和维护者信息改为实际值，
-并同步维护两份 nFPM 的版本。维护者字段使用 `GIT_COMMITTER_NAME` 和 `GIT_COMMITTER_EMAIL` 环境变量。
+Linux 包版本、维护者等产品信息读取 `build/config.yml`，系统依赖仍由两份 nFPM 配置维护。
+发布前需将配置中的公司、产品、主页和维护者信息改为实际值。
 
 ## 跨平台构建
 

@@ -1,5 +1,10 @@
 #!/bin/sh
 
+# Refresh the theme cache; pixmaps also supplies an unthemed lookup fallback.
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+fi
+
 # Update desktop database for .desktop file changes
 # This makes the application appear in application menus and registers its capabilities.
 if command -v update-desktop-database >/dev/null 2>&1; then

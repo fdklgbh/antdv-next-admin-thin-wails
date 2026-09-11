@@ -1,7 +1,19 @@
 version: '3'
 
 vars:
-  APP_NAME: "antdv-next-admin-thin-wails"
+  PROJECT_CONFIG:
+    sh: cat '{{.ROOT_DIR}}/build/config.yml'
+  APP_NAME: '{{(mustFromYaml .PROJECT_CONFIG).packaging.appName}}'
+  DISPLAY_NAME: '{{(mustFromYaml .PROJECT_CONFIG).info.productName}}'
+  APP_VERSION: '{{(mustFromYaml .PROJECT_CONFIG).info.version}}'
+  APP_DESCRIPTION: '{{(mustFromYaml .PROJECT_CONFIG).info.description}}'
+  APP_VENDOR: '{{(mustFromYaml .PROJECT_CONFIG).info.companyName}}'
+  APP_COPYRIGHT: '{{(mustFromYaml .PROJECT_CONFIG).info.copyright}}'
+  APP_COMMENTS: '{{(mustFromYaml .PROJECT_CONFIG).info.comments}}'
+  APP_HOMEPAGE: '{{(mustFromYaml .PROJECT_CONFIG).packaging.homepage}}'
+  APP_MAINTAINER: '{{(mustFromYaml .PROJECT_CONFIG).packaging.maintainer}}'
+  APP_RELEASE: '{{(mustFromYaml .PROJECT_CONFIG).packaging.release}}'
+  DESKTOP_CATEGORIES: '{{(mustFromYaml .PROJECT_CONFIG).packaging.categories}}'
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "pnpm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
@@ -19,6 +31,11 @@ includes:
   android: ./build/android/Taskfile.yml
 
 tasks:
+  config:show:
+    summary: 输出构建名称和产物目录（JSON，供 CI 使用）
+    cmds:
+      - 'echo {{dict "appName" .APP_NAME "binDir" .BIN_DIR | toJson | shellQuote}}'
+
   build:
     summary: 构建应用
     cmds:

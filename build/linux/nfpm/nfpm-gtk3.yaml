@@ -3,26 +3,32 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "antdv-next-admin-thin-wails"
+name: "${APP_NAME}"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.1.0"
+version: "${APP_VERSION}"
 section: "default"
 priority: "extra"
-maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A antdv-next-admin-thin-wails application"
-vendor: "My Company"
-homepage: "https://wails.io"
+maintainer: "${APP_MAINTAINER}"
+description: "${APP_DESCRIPTION}"
+vendor: "${APP_VENDOR}"
+homepage: "${APP_HOMEPAGE}"
 license: "MIT"
-release: "1"
+release: "${APP_RELEASE}"
 
 contents:
-  - src: "./bin/antdv-next-admin-thin-wails"
-    dst: "/usr/bin/antdv-next-admin-thin-wails"
+  - src: "./${APP_BIN_DIR}/${APP_NAME}"
+    dst: "/usr/bin/${APP_NAME}"
+    expand: true
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/1024x1024/apps/antdv-next-admin-thin-wails.png"
-  - src: "./build/linux/antdv-next-admin-thin-wails.desktop"
-    dst: "/usr/share/applications/antdv-next-admin-thin-wails.desktop"
+    dst: "/usr/share/icons/hicolor/1024x1024/apps/${APP_NAME}.png"
+    expand: true
+  - src: "./build/appicon.png"
+    dst: "/usr/share/pixmaps/${APP_NAME}.png"
+    expand: true
+  - src: "./build/linux/${APP_NAME}.desktop"
+    dst: "/usr/share/applications/${APP_NAME}.desktop"
+    expand: true
 
 # GTK3 + WebKit2GTK 4.1，与 Linux Taskfile 的 gtk3 构建标签保持一致。
 depends:

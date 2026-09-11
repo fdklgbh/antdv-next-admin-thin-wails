@@ -1,5 +1,16 @@
 version: '3'
 
+# nFPM 只对其支持的字段和 contents 路径展开环境变量。
+env:
+  APP_NAME: '{{.APP_NAME}}'
+  APP_VERSION: '{{.APP_VERSION}}'
+  APP_DESCRIPTION: '{{.APP_DESCRIPTION}}'
+  APP_VENDOR: '{{.APP_VENDOR}}'
+  APP_HOMEPAGE: '{{.APP_HOMEPAGE}}'
+  APP_MAINTAINER: '{{.APP_MAINTAINER}}'
+  APP_RELEASE: '{{.APP_RELEASE}}'
+  APP_BIN_DIR: '{{.BIN_DIR}}'
+
 includes:
   common: ../Taskfile.yml
 
@@ -198,12 +209,12 @@ tasks:
     dir: build
     cmds:
       - mkdir -p {{.ROOT_DIR}}/build/linux/appimage
-      - wails3 generate .desktop -name "{{.APP_NAME}}" -exec "{{.EXEC}}" -icon "{{.ICON}}" -outputfile "{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop" -categories "{{.CATEGORIES}}"
+      - wails3 generate .desktop -name {{.DISPLAY_NAME | shellQuote}} -comment {{.APP_DESCRIPTION | shellQuote}} -exec "{{.EXEC}}" -icon "{{.ICON}}" -outputfile "{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop" -categories {{.CATEGORIES | shellQuote}}
     vars:
       APP_NAME: '{{.APP_NAME}}'
       EXEC: '{{.APP_NAME}}'
       ICON: '{{.APP_NAME}}'
-      CATEGORIES: 'Development;'
+      CATEGORIES: '{{.DESKTOP_CATEGORIES}}'
       OUTPUTFILE: '{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop'
 
   run:

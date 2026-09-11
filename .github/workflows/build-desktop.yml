@@ -152,13 +152,15 @@ jobs:
       - name: 收集 Windows 单文件 EXE 和 NSIS 安装包
         if: runner.os == 'Windows'
         run: |
-          output=bin
-          executable_name=antdv-next-admin-thin-wails
-          installer_name=antdv-next-admin-thin-wails
           if [[ "$WAILS_MAJOR" == v2 ]]; then
             output=build/bin
             executable_name=$(node -p "require('./wails.json').outputfilename.replace(/\\.exe$/i, '')")
             installer_name=$(node -p "require('./wails.json').name")
+          else
+            metadata=$(task --silent config:show)
+            output=$(node -p "JSON.parse(process.argv[1]).binDir" "$metadata")
+            executable_name=$(node -p "JSON.parse(process.argv[1]).appName" "$metadata")
+            installer_name=$executable_name
           fi
           executable="$output/$executable_name.exe"
           installer="$output/$installer_name-amd64-installer.exe"
@@ -176,11 +178,13 @@ jobs:
       - name: 检查 deb 并收集 Linux 单文件程序
         if: runner.os == 'Linux'
         run: |
-          output=bin
-          executable_name=antdv-next-admin-thin-wails
           if [[ "$WAILS_MAJOR" == v2 ]]; then
             output=build/bin
             executable_name=$(node -p "require('./wails.json').outputfilename")
+          else
+            metadata=$(task --silent config:show)
+            output=$(node -p "JSON.parse(process.argv[1]).binDir" "$metadata")
+            executable_name=$(node -p "JSON.parse(process.argv[1]).appName" "$metadata")
           fi
           executable="$output/$executable_name"
           if [[ ! -s "$executable" || ! -x "$executable" ]]; then

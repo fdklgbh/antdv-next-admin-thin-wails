@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=antdv-next-admin-thin-wails
+Name=Antdv Next Admin Thin
 Exec=antdv-next-admin-thin-wails
 Icon=antdv-next-admin-thin-wails
 Categories=Development;
+Comment=A desktop admin application
 Terminal=false
 Keywords=wails
 Version=1.0
