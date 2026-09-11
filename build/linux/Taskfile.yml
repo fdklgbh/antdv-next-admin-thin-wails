@@ -222,12 +222,10 @@ tasks:
       - '{{.BIN_DIR}}/{{.APP_NAME}}'
 
   sign:deb:
-    summary: 对 DEB package 进行签名
-    desc: |
-      Signs the .deb package with a PGP key.
-      Set PGP_KEY in the vars section to override the key configured globally via
-      `wails3 setup` (~/.config/wails/defaults.yaml).
-      Password is retrieved from system keychain (run: wails3 setup signing)
+    desc: 使用 PGP 密钥签署 DEB 安装包
+    summary: |
+      设置 PGP_KEY 可覆盖 wails3 setup 的全局密钥配置（~/.config/wails/defaults.yaml）。
+      密码从系统凭据存储读取，使用 wails3 setup signing 配置。
     deps:
       - task: create:deb
     cmds:
@@ -236,24 +234,20 @@ tasks:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}*.deb" {{if .PGP_KEY}}--pgp-key "{{.PGP_KEY}}"{{end}} {{if .SIGN_ROLE}}--role "{{.SIGN_ROLE}}"{{end}}
 
   sign:rpm:
-    summary: 对 RPM package 进行签名
-    desc: |
-      Signs the .rpm package with a PGP key.
-      Set PGP_KEY in the vars section to override the key configured globally via
-      `wails3 setup` (~/.config/wails/defaults.yaml).
-      Password is retrieved from system keychain (run: wails3 setup signing)
+    desc: 使用 PGP 密钥签署 RPM 安装包
+    summary: |
+      设置 PGP_KEY 可覆盖 wails3 setup 的全局密钥配置（~/.config/wails/defaults.yaml）。
+      密码从系统凭据存储读取，使用 wails3 setup signing 配置。
     deps:
       - task: create:rpm
     cmds:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}*.rpm" {{if .PGP_KEY}}--pgp-key "{{.PGP_KEY}}"{{end}}
 
   sign:packages:
-    summary: 对所有 Linux package（DEB 和 RPM）进行签名
-    desc: |
-      Signs both .deb and .rpm packages with a PGP key.
-      Set PGP_KEY in the vars section to override the key configured globally via
-      `wails3 setup` (~/.config/wails/defaults.yaml).
-      Password is retrieved from system keychain (run: wails3 setup signing)
+    desc: 使用 PGP 密钥签署 DEB 和 RPM 安装包
+    summary: |
+      设置 PGP_KEY 可覆盖 wails3 setup 的全局密钥配置（~/.config/wails/defaults.yaml）。
+      密码从系统凭据存储读取，使用 wails3 setup signing 配置。
     cmds:
       - task: sign:deb
       - task: sign:rpm

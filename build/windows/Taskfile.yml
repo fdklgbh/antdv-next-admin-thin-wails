@@ -169,12 +169,10 @@ tasks:
       - '{{.BIN_DIR}}/{{.APP_NAME}}.exe'
 
   sign:
-    summary: 为 Windows executable 签名
-    desc: |
-      Signs the .exe with an Authenticode certificate.
-      Set SIGN_CERTIFICATE or SIGN_THUMBPRINT to override the certificate
-      configured globally via `wails3 setup` (~/.config/wails/defaults.yaml).
-      Password is retrieved from system keychain (run: wails3 setup signing)
+    desc: 使用 Authenticode 证书签署 Windows 程序
+    summary: |
+      设置 SIGN_CERTIFICATE 或 SIGN_THUMBPRINT，可覆盖 wails3 setup 的全局证书配置
+      （~/.config/wails/defaults.yaml）。密码从系统凭据存储读取，使用 wails3 setup signing 配置。
     deps:
       - task: build
     cmds:
@@ -183,12 +181,10 @@ tasks:
       - wails3 tool sign --input "{{.BIN_DIR}}/{{.APP_NAME}}.exe" {{if .SIGN_CERTIFICATE}}--certificate "{{.SIGN_CERTIFICATE}}"{{end}} {{if .SIGN_THUMBPRINT}}--thumbprint "{{.SIGN_THUMBPRINT}}"{{end}} {{if .TIMESTAMP_SERVER}}--timestamp "{{.TIMESTAMP_SERVER}}"{{end}}
 
   sign:installer:
-    summary: 为 NSIS installer 签名
-    desc: |
-      Creates and signs the NSIS installer.
-      Set SIGN_CERTIFICATE or SIGN_THUMBPRINT to override the certificate
-      configured globally via `wails3 setup` (~/.config/wails/defaults.yaml).
-      Password is retrieved from system keychain (run: wails3 setup signing)
+    desc: 创建并签署 NSIS 安装包
+    summary: |
+      设置 SIGN_CERTIFICATE 或 SIGN_THUMBPRINT，可覆盖 wails3 setup 的全局证书配置
+      （~/.config/wails/defaults.yaml）。密码从系统凭据存储读取，使用 wails3 setup signing 配置。
     deps:
       - task: create:nsis:installer
         vars:
