@@ -1,4 +1,4 @@
-package main
+package windowrestore
 
 import (
 	"log"
@@ -48,7 +48,8 @@ var restoreCallback = windows.NewCallback(func(_ uintptr, _ uint32, hwnd uintptr
 	return 0
 })
 
-func configureWindowRestore() func() {
+// Configure installs the restore listener and returns its shutdown function.
+func Configure() func() {
 	ready := make(chan uint32, 1)
 	done := make(chan struct{})
 	go func() {

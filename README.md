@@ -7,6 +7,47 @@
 You can configure the project by editing `wails.json`. More information about the project settings can be found
 here: https://wails.io/docs/reference/project-config
 
+## 拉取仓库与前端子模块
+
+v2 与 v3 使用同一个后端仓库，v2 位于 `wailsv2` 分支，`frontend/` 是独立子模块，
+对应前端分支 `no-auth-wails-v2`。首次克隆需同时拉取子模块；以下 SSH 方式要求已配置 GitHub SSH 密钥：
+
+```sh
+git clone --branch wailsv2 --recurse-submodules git@github.com:fdklgbh/antdv-next-admin-thin-wails.git antdv-next-admin-thin-wails-v2
+cd antdv-next-admin-thin-wails-v2
+```
+
+没有配置 SSH 时可用 HTTPS。由于 `.gitmodules` 保存的是 SSH 地址，子模块命令需临时转换地址；
+以下配置仅对该次命令生效，不修改全局 Git 设置：
+
+```sh
+git clone --branch wailsv2 https://github.com/fdklgbh/antdv-next-admin-thin-wails.git antdv-next-admin-thin-wails-v2
+cd antdv-next-admin-thin-wails-v2
+git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
+```
+
+如果已经克隆但 `frontend/` 为空，在项目根目录补拉：
+
+```sh
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+后续更新前先检查并保存主仓库和前端子模块中的本地修改，再执行：
+
+```sh
+git switch wailsv2
+git pull --ff-only origin wailsv2
+git submodule sync --recursive
+git submodule update --init --recursive
+git submodule status --recursive
+```
+
+HTTPS 用户将上述 `submodule update` 命令替换为带 `-c` 的版本即可。
+普通子模块更新检出的是后端提交锁定的前端提交，不是前端分支的最新提交；
+子模块处于 detached HEAD 是正常现象。日常获取项目不要使用 `git submodule update --remote`，
+以免前后端版本不匹配。v3 应另外克隆 `master` 分支，放到不同目录。
+
 ## 复用项目：集中配置名称与包信息
 
 通用产品信息维护在 `wails.json`，Windows EXE / NSIS 沿用 Wails v2 的配置和资源模板。

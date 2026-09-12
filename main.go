@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"antdv-next-admin-thin-wails-v2/internal/system"
+	"antdv-next-admin-thin-wails-v2/internal/windowrestore"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -37,7 +38,7 @@ func main() {
 	}
 	// Create an instance of the app structure
 	app := NewApp()
-	if stopWindowRestore := configureWindowRestore(); stopWindowRestore != nil {
+	if stopWindowRestore := windowrestore.Configure(); stopWindowRestore != nil {
 		defer stopWindowRestore()
 	}
 
