@@ -1,4 +1,4 @@
-package main
+package windowrestore
 
 import (
 	"log"
@@ -10,7 +10,8 @@ import (
 
 var setWindowPos = windows.NewLazySystemDLL("user32.dll").NewProc("SetWindowPos")
 
-func configureWindowRestore(window *application.WebviewWindow) {
+// Configure refreshes the client bounds after a Windows restore event.
+func Configure(window *application.WebviewWindow) {
 	window.OnWindowEvent(events.Windows.WindowUnMinimise, func(_ *application.WindowEvent) {
 		// Run after the restore message has finished: WebView2 may have used
 		// the parked, minimised window's monitor scale for its first resize.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"antdv-next-admin-thin-wails/internal/system"
+	"antdv-next-admin-thin-wails/internal/windowrestore"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"gopkg.in/yaml.v3"
@@ -100,7 +101,7 @@ func main() {
 		BackgroundColour: application.NewRGB(6, 7, 15),
 		URL:              "/",
 	})
-	configureWindowRestore(window)
+	windowrestore.Configure(window)
 
 	// Create a goroutine that emits an event containing the current time every second.
 	// The frontend can listen to this event and update the UI accordingly.

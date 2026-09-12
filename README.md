@@ -4,6 +4,47 @@
 
 当前 Go 依赖为 **Wails v3.0.0-beta.19**。本 README 对应 v3 项目，构建配置入口为 `Taskfile.yml` 和 `build/config.yml`。
 
+## 拉取仓库与前端子模块
+
+v3 位于后端仓库的 `master` 分支，`frontend/` 是独立子模块，对应前端分支
+`no-auth-wails-v3`。首次克隆需同时拉取子模块；以下 SSH 方式要求已配置 GitHub SSH 密钥：
+
+```sh
+git clone --branch master --recurse-submodules git@github.com:fdklgbh/antdv-next-admin-thin-wails.git antdv-next-admin-thin-wails
+cd antdv-next-admin-thin-wails
+```
+
+没有配置 SSH 时可用 HTTPS。由于 `.gitmodules` 保存的是 SSH 地址，子模块命令需临时转换地址；
+以下配置仅对该次命令生效，不修改全局 Git 设置：
+
+```sh
+git clone --branch master https://github.com/fdklgbh/antdv-next-admin-thin-wails.git antdv-next-admin-thin-wails
+cd antdv-next-admin-thin-wails
+git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
+```
+
+如果已经克隆但 `frontend/` 为空，在项目根目录补拉：
+
+```sh
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+后续更新前先检查并保存主仓库和前端子模块中的本地修改，再执行：
+
+```sh
+git switch master
+git pull --ff-only origin master
+git submodule sync --recursive
+git submodule update --init --recursive
+git submodule status --recursive
+```
+
+HTTPS 用户将上述 `submodule update` 命令替换为带 `-c` 的版本即可。
+普通子模块更新检出的是后端提交锁定的前端提交，不是前端分支的最新提交；
+子模块处于 detached HEAD 是正常现象。日常获取项目不要使用 `git submodule update --remote`，
+以免前后端版本不匹配。v2 应另外克隆 `wailsv2` 分支，放到不同目录。
+
 ## 复用项目：集中配置名称与包信息
 
 产品信息统一维护在 `build/config.yml`。Taskfile 读取配置，Linux 打包任务通过环境变量
@@ -317,8 +358,7 @@ task build GOOS=linux ARCH=amd64 GTK_VERSION=4
 frontend/                    Vue 前端及测试
 internal/system/             系统服务
 main.go                      应用入口与窗口配置
-window_restore_windows.go    Windows 窗口恢复处理
-window_restore_other.go      其他平台的对应空实现
+internal/windowrestore/      Windows 窗口恢复处理及其他平台的空实现
 Taskfile.yml                 开发、构建和打包入口
 build/config.yml             Wails 产品及开发模式配置
 build/Taskfile.yml           前端、绑定、图标等共用任务
